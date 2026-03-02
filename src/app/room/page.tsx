@@ -21,6 +21,7 @@ export default function RoomLeadDashboard() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [selectedCompany, setSelectedCompany] = useState("");
     const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [skippedTickets, setSkippedTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<{ full_name: string; role: string; company_id: string | null } | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -63,6 +64,15 @@ export default function RoomLeadDashboard() {
             .in("status", ["pending", "called", "interviewing"])
             .order("position", { ascending: true });
         setTickets((data || []) as unknown as Ticket[]);
+
+        // Also fetch skipped/no-show tickets for the recall section
+        const { data: skipped } = await supabase
+            .from("queue_tickets")
+            .select("id, status, position, created_at, registration_id, registration:registrations(id, full_name, student_number, email, level)")
+            .eq("company_id", selectedCompany)
+            .in("status", ["skipped"])
+            .order("position", { ascending: true });
+        setSkippedTickets((skipped || []) as unknown as Ticket[]);
     }, [selectedCompany]);
 
     useEffect(() => { fetchTickets(); }, [fetchTickets]);
@@ -101,6 +111,26 @@ export default function RoomLeadDashboard() {
             return `${t.company?.name} (${t.status})`;
         }
         return null;
+    };
+
+    /**
+     * Recall a skipped/no-show ticket:
+     * Assigns a new position at the END of the current queue and sets back to pending.
+     */
+    const recallTicket = async (ticket: Ticket) => {
+        setConflict(null);
+        const { data: maxData } = await supabase
+            .from("queue_tickets")
+            .select("position")
+            .eq("company_id", selectedCompany)
+            .order("position", { ascending: false })
+            .limit(1);
+        const maxPos = maxData?.[0]?.position ?? 0;
+        await supabase
+            .from("queue_tickets")
+            .update({ status: "pending", position: maxPos + 1 })
+            .eq("id", ticket.id);
+        await fetchTickets();
     };
 
     const updateStatus = async (ticket: Ticket, newStatus: string) => {
@@ -154,7 +184,7 @@ export default function RoomLeadDashboard() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <a href="/board" className="text-xs text-slate-500 hover:text-slate-300 hidden sm:block transition-colors">Waiting Room Board ↗</a>
+                    <a href="/display" target="_blank" className="text-xs text-slate-500 hover:text-slate-300 hidden sm:block transition-colors">Display Board ↗</a>
                     <button onClick={handleSignOut} className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-all">Sign Out</button>
                 </div>
             </header>
@@ -310,6 +340,32 @@ export default function RoomLeadDashboard() {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Skipped / No-Show — Recall section */}
+                        {skippedTickets.length > 0 && (
+                            <div className="bg-slate-900 border border-slate-700/50 rounded-2xl overflow-hidden opacity-80">
+                                <div className="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
+                                    <h3 className="text-slate-400 font-bold text-sm">Skipped / No Show</h3>
+                                    <span className="px-2 py-0.5 bg-slate-700 text-slate-400 text-xs font-bold rounded-full">{skippedTickets.length}</span>
+                                </div>
+                                <div className="divide-y divide-slate-700/30">
+                                    {skippedTickets.map(ticket => (
+                                        <div key={ticket.id} className="flex items-center justify-between p-4 gap-4">
+                                            <div>
+                                                <p className="text-slate-300 font-semibold text-sm">{ticket.registration?.full_name}</p>
+                                                <p className="text-slate-500 text-xs">{ticket.registration?.student_number} · {ticket.registration?.level}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => recallTicket(ticket)}
+                                                className="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 rounded-xl font-semibold text-xs transition-all whitespace-nowrap"
+                                            >
+                                                ↩ Recall
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

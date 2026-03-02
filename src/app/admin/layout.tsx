@@ -79,7 +79,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* Quick links */}
             <div className="px-3 pb-3 space-y-1">
-                <Link href="/board" target="_blank" className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-700/30 transition-all">
+                <Link href="/display" target="_blank" className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-700/30 transition-all">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
                     </svg>
