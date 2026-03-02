@@ -21,7 +21,8 @@ export default function RoomLeadDashboard() {
     const [selectedCompany, setSelectedCompany] = useState("");
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
-    const [profile, setProfile] = useState<{ full_name: string } | null>(null);
+    const [profile, setProfile] = useState<{ full_name: string; role: string; company_id: string | null } | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     const router = useRouter();
     const supabase = createClient();
 
@@ -29,12 +30,27 @@ export default function RoomLeadDashboard() {
         const init = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) { router.push("/login"); return; }
-            const { data: p } = await supabase.from("profiles").select("full_name, role").eq("id", user.id).single();
+            const { data: p } = await supabase.from("profiles").select("full_name, role, company_id").eq("id", user.id).single();
             setProfile(p);
             if (p?.role !== "room_lead" && p?.role !== "admin") { router.push("/login"); return; }
 
-            const { data: comps } = await supabase.from("companies").select("*").order("name");
-            setCompanies(comps || []);
+            const admin = p?.role === "admin";
+            setIsAdmin(admin);
+
+            if (admin) {
+                // Admins can pick any company
+                const { data: comps } = await supabase.from("companies").select("*").order("name");
+                setCompanies(comps || []);
+            } else {
+                // Room leads are locked to their assigned company
+                if (p?.company_id) {
+                    const { data: comp } = await supabase.from("companies").select("*").eq("id", p.company_id).single();
+                    if (comp) {
+                        setCompanies([comp]);
+                        setSelectedCompany(comp.id);
+                    }
+                }
+            }
             setLoading(false);
         };
         init();
@@ -106,20 +122,44 @@ export default function RoomLeadDashboard() {
             </header>
 
             <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
-                {/* Company selector */}
-                <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-5">
-                    <label className="block text-sm font-semibold text-slate-300 mb-3">Select Your Company / Room</label>
-                    <select
-                        value={selectedCompany}
-                        onChange={e => setSelectedCompany(e.target.value)}
-                        className="w-full h-12 px-4 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-                    >
-                        <option value="">-- Select Company --</option>
-                        {companies.map(c => (
-                            <option key={c.id} value={c.id}>{c.name} · {c.room_number} ({c.interview_date === "2026-03-03" ? "Mar 3" : "Mar 4"})</option>
-                        ))}
-                    </select>
-                </div>
+                {/* Company display — auto-locked for room leads, dropdown for admins */}
+                {isAdmin ? (
+                    <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-5">
+                        <label className="block text-sm font-semibold text-slate-300 mb-3">Select Company / Room (Admin View)</label>
+                        <select
+                            value={selectedCompany}
+                            onChange={e => setSelectedCompany(e.target.value)}
+                            className="w-full h-12 px-4 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                        >
+                            <option value="">-- Select Company --</option>
+                            {companies.map(c => (
+                                <option key={c.id} value={c.id}>{c.name} · {c.room_number} ({c.interview_date === "2026-03-03" ? "Mar 3" : "Mar 4"})</option>
+                            ))}
+                        </select>
+                    </div>
+                ) : profile?.company_id ? (
+                    // Room lead is assigned — show their locked company
+                    companies.length > 0 && (
+                        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-5 flex items-center justify-between">
+                            <div>
+                                <p className="text-xs text-indigo-400 font-semibold uppercase tracking-wide mb-1">Your Assigned Room</p>
+                                <p className="text-white text-xl font-black">{companies[0].name}</p>
+                                <p className="text-slate-400 text-sm">{companies[0].room_number} · {companies[0].interview_date === "2026-03-03" ? "March 3" : "March 4"}</p>
+                            </div>
+                            <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                                <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                            </div>
+                        </div>
+                    )
+                ) : (
+                    // Room lead not assigned yet
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-center">
+                        <p className="text-amber-400 font-bold text-lg mb-1">⚠ No Company Assigned</p>
+                        <p className="text-slate-400 text-sm">Please ask an admin to assign you to a company in User Management.</p>
+                    </div>
+                )}
 
                 {selectedCompany && (
                     <>
@@ -158,7 +198,6 @@ export default function RoomLeadDashboard() {
                                 {queueTickets.length === 0 ? (
                                     <div className="text-center py-12 text-slate-500">No candidates in queue right now.</div>
                                 ) : queueTickets.map((ticket, i) => {
-                                    const isCalledOrPending = ticket.status === "pending" || ticket.status === "called";
                                     return (
                                         <div key={ticket.id} className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 ${i === 0 ? "bg-white/5" : ""}`}>
                                             <div className="flex items-center gap-3">
@@ -206,7 +245,7 @@ export default function RoomLeadDashboard() {
                         </div>
                     </>
                 )}
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

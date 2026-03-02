@@ -83,14 +83,14 @@ export default function RegistrationPage() {
       return;
     }
 
-    // Create queue tickets for each selected company
-    const allSelected = [
-      ...form.companies_march3.map(company_id => ({ registration_id: reg.id, company_id, status: "pending", position: 999 })),
-      ...form.companies_march4.map(company_id => ({ registration_id: reg.id, company_id, status: "pending", position: 999 })),
-    ];
-
-    if (allSelected.length > 0) {
-      await supabase.from("queue_tickets").insert(allSelected);
+    // Intelligently allocate queue positions via server-side API
+    const allCompanyIds = [...form.companies_march3, ...form.companies_march4];
+    if (allCompanyIds.length > 0) {
+      await fetch("/api/queue/allocate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationId: reg.id, companyIds: allCompanyIds }),
+      });
     }
 
     setSubmitting(false);

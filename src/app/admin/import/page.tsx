@@ -97,7 +97,7 @@ export default function ImportPage() {
     const [rows, setRows] = useState<ParsedRow[]>([]);
     const [fileName, setFileName] = useState("");
     const [importing, setImporting] = useState(false);
-    const [result, setResult] = useState<{ success: number; errors: number } | null>(null);
+    const [result, setResult] = useState<{ success: number; errors: number; companiesCreated: number } | null>(null);
     const [step, setStep] = useState<"upload" | "preview" | "done">("upload");
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -254,7 +254,11 @@ export default function ImportPage() {
                         <div className="flex justify-center gap-6 text-sm">
                             <div className="text-center">
                                 <div className="text-2xl font-black text-emerald-400">{result.success}</div>
-                                <div className="text-slate-400">Inserted</div>
+                                <div className="text-slate-400">Registrations</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-black text-indigo-400">{result.companiesCreated}</div>
+                                <div className="text-slate-400">Companies Added</div>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-black text-red-400">{result.errors}</div>

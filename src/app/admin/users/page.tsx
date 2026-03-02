@@ -2,40 +2,53 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 
+interface Company { id: string; name: string; room_number: string; interview_date: string }
 interface UserProfile {
     id: string;
     full_name: string;
     email: string;
     role: "admin" | "room_lead";
+    company_id: string | null;
     created_at: string;
+    company?: Company | null;
 }
 
 const ROLES = ["admin", "room_lead"] as const;
 
 export default function UsersPage() {
     const [users, setUsers] = useState<UserProfile[]>([]);
+    const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editUser, setEditUser] = useState<UserProfile | null>(null);
-    const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "room_lead" as "admin" | "room_lead" });
+    const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "room_lead" as "admin" | "room_lead", company_id: "" });
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const supabase = createClient();
 
-    const fetchUsers = useCallback(async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase
-            .from("profiles")
-            .select("id, full_name, email, role, created_at")
-            .order("created_at", { ascending: false });
-        setUsers(data || []);
+        const [{ data: usersData }, { data: companiesData }] = await Promise.all([
+            supabase
+                .from("profiles")
+                .select("id, full_name, email, role, company_id, created_at, company:companies(id, name, room_number, interview_date)")
+                .order("created_at", { ascending: false }),
+            supabase.from("companies").select("*").order("name"),
+        ]);
+        // Supabase returns the join as an array; normalise to single object
+        const normalised = (usersData || []).map((u: Record<string, unknown>) => ({
+            ...u,
+            company: Array.isArray(u.company) ? u.company[0] ?? null : u.company ?? null,
+        })) as UserProfile[];
+        setUsers(normalised);
+        setCompanies(companiesData || []);
         setLoading(false);
     }, []);
 
-    useEffect(() => { fetchUsers(); }, [fetchUsers]);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const resetForm = () => {
-        setForm({ full_name: "", email: "", password: "", role: "room_lead" });
+        setForm({ full_name: "", email: "", password: "", role: "room_lead", company_id: "" });
         setEditUser(null);
         setFormError(null);
         setShowForm(false);
@@ -43,7 +56,7 @@ export default function UsersPage() {
 
     const openEdit = (u: UserProfile) => {
         setEditUser(u);
-        setForm({ full_name: u.full_name, email: u.email, password: "", role: u.role });
+        setForm({ full_name: u.full_name, email: u.email, password: "", role: u.role, company_id: u.company_id || "" });
         setShowForm(true);
     };
 
@@ -52,23 +65,26 @@ export default function UsersPage() {
         setSaving(true);
         setFormError(null);
 
+        const companyId = form.company_id || null;
+
         if (editUser) {
-            // Update profile fields
-            const updates: Partial<UserProfile> = { full_name: form.full_name, role: form.role };
-            const { error } = await supabase.from("profiles").update(updates).eq("id", editUser.id);
+            const { error } = await supabase.from("profiles").update({
+                full_name: form.full_name,
+                role: form.role,
+                company_id: companyId,
+            }).eq("id", editUser.id);
             if (error) { setFormError(error.message); setSaving(false); return; }
         } else {
-            // Create via API route (needs service role)
             const res = await fetch("/api/admin/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify({ ...form, company_id: companyId }),
             });
             const result = await res.json();
             if (!res.ok) { setFormError(result.error || "Failed to create user"); setSaving(false); return; }
         }
 
-        await fetchUsers();
+        await fetchData();
         resetForm();
         setSaving(false);
     };
@@ -90,7 +106,7 @@ export default function UsersPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-black text-white">User Management</h1>
-                    <p className="text-slate-400 mt-1">Manage admin and room lead accounts</p>
+                    <p className="text-slate-400 mt-1">Manage admin and room lead accounts. Each room lead is assigned to one company.</p>
                 </div>
                 <button
                     onClick={() => { resetForm(); setShowForm(true); }}
@@ -133,11 +149,32 @@ export default function UsersPage() {
                             )}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-300 mb-1.5">Role</label>
-                                <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as "admin" | "room_lead" }))}
+                                <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as "admin" | "room_lead", company_id: e.target.value === "admin" ? "" : f.company_id }))}
                                     className="w-full px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
                                     {ROLES.map(r => <option key={r} value={r}>{r === "admin" ? "Admin" : "Room Lead"}</option>)}
                                 </select>
                             </div>
+                            {/* Company assignment — only for room leads */}
+                            {form.role === "room_lead" && (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-300 mb-1.5">
+                                        Assigned Company / Room
+                                        <span className="ml-1 text-slate-500 font-normal">(required for room leads)</span>
+                                    </label>
+                                    <select
+                                        value={form.company_id}
+                                        onChange={e => setForm(f => ({ ...f, company_id: e.target.value }))}
+                                        className="w-full px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    >
+                                        <option value="">-- Select company --</option>
+                                        {companies.map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.name} · {c.room_number} ({c.interview_date === "2026-03-03" ? "Mar 3" : "Mar 4"})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             {formError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-xl">{formError}</div>}
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={resetForm} className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold text-sm transition-all">Cancel</button>
@@ -159,6 +196,7 @@ export default function UsersPage() {
                             <tr className="border-b border-slate-700/50">
                                 <th className="text-left px-4 py-3 text-slate-400 font-semibold">Name</th>
                                 <th className="text-left px-4 py-3 text-slate-400 font-semibold">Role</th>
+                                <th className="text-left px-4 py-3 text-slate-400 font-semibold">Assigned Room</th>
                                 <th className="text-left px-4 py-3 text-slate-400 font-semibold hidden sm:table-cell">Added</th>
                                 <th className="text-right px-4 py-3 text-slate-400 font-semibold">Actions</th>
                             </tr>
@@ -171,6 +209,20 @@ export default function UsersPage() {
                                         <p className="text-slate-500 text-xs">{u.email}</p>
                                     </td>
                                     <td className="px-4 py-3">{roleBadge(u.role)}</td>
+                                    <td className="px-4 py-3">
+                                        {u.role === "room_lead" ? (
+                                            u.company ? (
+                                                <div>
+                                                    <p className="text-slate-300 text-sm font-medium">{(u.company as Company).name}</p>
+                                                    <p className="text-slate-500 text-xs">{(u.company as Company).room_number}</p>
+                                                </div>
+                                            ) : (
+                                                <span className="text-amber-500 text-xs font-semibold">⚠ Not assigned</span>
+                                            )
+                                        ) : (
+                                            <span className="text-slate-600 text-xs">—</span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3 text-slate-400 text-xs hidden sm:table-cell">
                                         {new Date(u.created_at).toLocaleDateString()}
                                     </td>
