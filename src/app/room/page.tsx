@@ -148,8 +148,23 @@ export default function RoomLeadDashboard() {
             }
         }
 
-        await supabase.from("queue_tickets").update({ status: newStatus }).eq("id", ticket.id);
-        await fetchTickets();
+        // Run update directly — if the strict DB UNIQUE INDEX enforces a conflict, catch it
+        const { error } = await supabase.from("queue_tickets").update({ status: newStatus }).eq("id", ticket.id);
+
+        if (error) {
+            console.error("Update error:", error);
+            // 23505 is PostgreSQL uniqueviolation
+            if (error.code === "23505") {
+                setConflict({
+                    ticketId: ticket.id,
+                    msg: `${ticket.registration?.full_name} was just called or moved to interview by another room. Please refresh.`,
+                });
+            } else {
+                alert(`Error updating status: ${error.message}`);
+            }
+        } else {
+            await fetchTickets();
+        }
     };
 
     const handleSignOut = async () => {
@@ -264,7 +279,7 @@ export default function RoomLeadDashboard() {
                                         <h2 className="text-white text-2xl font-black">{activeTicket.registration?.full_name}</h2>
                                         <p className="text-slate-400 text-sm mt-1">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
                                     </div>
-                                    <button onClick={() => updateStatus(activeTicket, "completed")}
+                                    <button onClick={() => { if (confirm("Mark interview as completed?")) updateStatus(activeTicket, "completed"); }}
                                         className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20 transition-all whitespace-nowrap">
                                         ✓ Mark Complete
                                     </button>
@@ -285,11 +300,11 @@ export default function RoomLeadDashboard() {
                                         <p className="text-slate-400 text-xs">{calledTicket.registration?.student_number}</p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => updateStatus(calledTicket, "interviewing")} disabled={!!activeTicket}
+                                        <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
                                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all">
                                             Start Interview
                                         </button>
-                                        <button onClick={() => updateStatus(calledTicket, "skipped")}
+                                        <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
                                             className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-sm transition-all">
                                             No Show
                                         </button>
@@ -326,12 +341,12 @@ export default function RoomLeadDashboard() {
                                         <div className="flex gap-2 w-full sm:w-auto">
                                             {/* Allow calling next even if someone else is being interviewed — reduces wait */}
                                             {!calledTicket && (
-                                                <button onClick={() => updateStatus(ticket, "called")}
+                                                <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
                                                     className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-sm transition-all">
                                                     Call to Room
                                                 </button>
                                             )}
-                                            <button onClick={() => updateStatus(ticket, "skipped")}
+                                            <button onClick={() => { if (confirm(`Skip ${ticket.registration?.full_name} and put them in No-Show list?`)) updateStatus(ticket, "skipped"); }}
                                                 className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-semibold text-sm transition-all">
                                                 Skip
                                             </button>
@@ -356,7 +371,7 @@ export default function RoomLeadDashboard() {
                                                 <p className="text-slate-500 text-xs">{ticket.registration?.student_number} · {ticket.registration?.level}</p>
                                             </div>
                                             <button
-                                                onClick={() => recallTicket(ticket)}
+                                                onClick={() => { if (confirm(`Recall ${ticket.registration?.full_name} back to the end of the waiting queue?`)) recallTicket(ticket); }}
                                                 className="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 rounded-xl font-semibold text-xs transition-all whitespace-nowrap"
                                             >
                                                 ↩ Recall

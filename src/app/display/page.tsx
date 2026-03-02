@@ -36,6 +36,7 @@ export default function DisplayBoard() {
     const [nowCalling, setNowCalling] = useState<{ name: string; company: string } | null>(null);
     const [calledVisible, setCalledVisible] = useState(true);
     const [time, setTime] = useState(new Date());
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const knownCalledTix = useRef<Set<string>>(new Set());
 
     // Stable supabase client
@@ -110,8 +111,28 @@ export default function DisplayBoard() {
             clearInterval(clock);
             clearInterval(poll);
             ch.unsubscribe();
+            document.removeEventListener("fullscreenchange", handleFsChange);
         };
-    }, [fetchData]);   // fetchData changes when selectedDate changes → re-subscribes
+    }, [fetchData]);
+
+    const handleFsChange = () => {
+        setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    useEffect(() => {
+        document.addEventListener("fullscreenchange", handleFsChange);
+        return () => document.removeEventListener("fullscreenchange", handleFsChange);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
 
     /* ── Layout helpers ─────────────────────────────────────── */
     const cols = cards.length <= 4 ? "grid-cols-2" : "grid-cols-3";
@@ -159,10 +180,23 @@ export default function DisplayBoard() {
                     )}
                 </div>
 
-                {/* Clock */}
-                <div className="flex-shrink-0 text-right">
-                    <p className="text-white font-mono text-xl font-bold tabular-nums">{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
-                    <p className="text-slate-500 text-xs">{DATES.find(d => d.value === selectedDate)?.label}</p>
+                {/* Clock & Fullscreen */}
+                <div className="flex-shrink-0 flex items-center gap-4 text-right">
+                    <div>
+                        <p className="text-white font-mono text-xl font-bold tabular-nums">{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
+                        <p className="text-slate-500 text-xs">{DATES.find(d => d.value === selectedDate)?.label}</p>
+                    </div>
+                    <button
+                        onClick={toggleFullscreen}
+                        className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700/50"
+                        title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                    >
+                        {isFullscreen ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15v-4H5m10 4v-4h4m-4-6h-4v4M9 5v4H5" /></svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                        )}
+                    </button>
                 </div>
             </header>
 
