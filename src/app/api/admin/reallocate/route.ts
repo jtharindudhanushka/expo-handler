@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
     // 2. Fetch all registrations (or the specified ones)
     let regQuery = supabaseAdmin
         .from("registrations")
-        .select("id, full_name, companies_march3, companies_march4, created_at")
-        .order("created_at", { ascending: true });
+        .select("id, full_name, companies_march3, companies_march4, created_at, timestamp")
+        .order("created_at", { ascending: true }); // rough pre-sort; refined below
 
     if (registrationIds && registrationIds.length > 0) {
         regQuery = regQuery.in("id", registrationIds);
@@ -96,10 +96,18 @@ export async function POST(req: NextRequest) {
             return march3Names.includes(companyKey) || march4Names.includes(companyKey);
         });
 
-        // Already sorted by created_at from the DB query
-        if (forThisCompany.length === 0) continue;
+        // Prefer CSV timestamp field; fall back to DB created_at
+        const getTime = (r: { timestamp?: string | null; created_at: string }) => {
+            const ts = r.timestamp ? new Date(r.timestamp).getTime() : NaN;
+            return isNaN(ts) ? new Date(r.created_at).getTime() : ts;
+        };
 
-        const tickets = forThisCompany.map((reg, idx) => ({
+        // Sort ascending: earliest registered = position 1
+        const sorted = [...forThisCompany].sort((a, b) => getTime(a) - getTime(b));
+
+        if (sorted.length === 0) continue;
+
+        const tickets = sorted.map((reg, idx) => ({
             registration_id: reg.id,
             company_id: company.id,
             status: "pending",

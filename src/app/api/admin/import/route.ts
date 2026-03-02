@@ -26,6 +26,23 @@ function splitCompanies(value: string | null): string[] {
         .filter(Boolean);
 }
 
+/**
+ * Parse a CSV timestamp in DD/MM/YYYY HH:MM:SS format into an ISO-8601 string.
+ * Returns null if the string is empty or unrecognised.
+ * e.g. "01/03/2026 13:57:43" → "2026-03-01T13:57:43.000Z"
+ */
+function parseCsvTimestamp(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    // Match DD/MM/YYYY HH:MM:SS  (also handles D/M/YYYY)
+    const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return null;
+    const [, dd, mm, yyyy, hh, min, ss] = m;
+    // Build as UTC (the event is local, but we just want a consistent sortable value)
+    const iso = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh}:${min}:${ss}.000Z`;
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? null : iso;
+}
+
 export async function POST(req: NextRequest) {
     if (!(await isAdmin())) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -39,7 +56,7 @@ export async function POST(req: NextRequest) {
 
     // Clean rows: set defaults and remove completely empty ones
     const cleanRows = rows.map((r: Record<string, string>) => ({
-        timestamp: r.timestamp || null,
+        timestamp: parseCsvTimestamp(r.timestamp) ?? r.timestamp ?? null,
         full_name: r.full_name?.trim() || null,
         university: r.university?.trim() || null,
         student_number: r.student_number?.trim() || null,
