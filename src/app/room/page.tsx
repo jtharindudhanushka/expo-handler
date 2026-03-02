@@ -12,6 +12,7 @@ export default function RoomDashboard() {
     const [tickets, setTickets] = useState<any[]>([])
     const [candidates, setCandidates] = useState<Record<string, any>>({})
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     // Fetch companies
     useEffect(() => {
@@ -19,9 +20,17 @@ export default function RoomDashboard() {
             const unsub = onSnapshot(collection(db, "companies"), (snapshot) => {
                 setCompanies(snapshot.docs.map(d => ({ id: d.id, ...d.data() })))
                 setLoading(false)
+            }, (err) => {
+                console.error("Firestore error:", err)
+                setError("Firestore Error: Please check your Firebase Security Rules (must be in Test Mode) or Vercel Environment Variables.")
+                setLoading(false)
             })
             return () => unsub()
-        } catch { setLoading(false) }
+        } catch (e: any) {
+            console.error(e)
+            setError(e.message || "Firebase not configured.")
+            setLoading(false)
+        }
     }, [])
 
     // Fetch tickets for selected company
@@ -76,6 +85,7 @@ export default function RoomDashboard() {
         await updateDoc(doc(db, "queue_tickets", ticketId), { status: "skipped" })
     }
 
+    if (error) return <div className="p-8 text-center text-red-500 font-medium max-w-lg mx-auto mt-20">{error}</div>
     if (loading) return <div className="p-8 text-center text-slate-500 font-medium">Loading Database Connection...</div>
 
     return (

@@ -13,6 +13,7 @@ export default function RegistrationView() {
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // We only need to set this up if Firebase is configured. 
@@ -25,10 +26,15 @@ export default function RegistrationView() {
           setCompanies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
         }
         setLoading(false)
+      }, (err) => {
+        console.error("Firestore error:", err)
+        setError("Firestore Error: Please check your Firebase Security Rules (must be in Test Mode) or Vercel Environment Variables.")
+        setLoading(false)
       })
       return () => unsub()
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Firebase not fully configured yet.")
+      setError(e.message || "Firebase not configured.")
       setLoading(false)
     }
   }, [])
@@ -89,8 +95,8 @@ export default function RegistrationView() {
     }
   }
 
+  if (error) return <div className="p-8 text-center text-red-500 font-medium max-w-lg mx-auto mt-20">{error}</div>
   if (loading) return <div className="p-8 text-center text-slate-500 font-medium">Loading Database Connection...</div>
-
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 flex items-center justify-center">
       <Card className="w-full max-w-lg shadow-xl shadow-slate-200/50">

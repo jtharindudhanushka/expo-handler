@@ -9,6 +9,7 @@ export default function PublicBoard() {
     const [calledTickets, setCalledTickets] = useState<any[]>([])
     const [companies, setCompanies] = useState<Record<string, any>>({})
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         try {
@@ -35,10 +36,24 @@ export default function PublicBoard() {
                 t.sort((a: any, b: any) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0)) // Newest first
                 setCalledTickets(t)
                 setLoading(false)
+            }, (err) => {
+                console.error("Firestore error:", err)
+                setError("Firestore Error: Please check your Firebase Security Rules (must be in Test Mode) or Vercel Environment Variables.")
+                setLoading(false)
             })
             return () => unsub()
-        } catch { setLoading(false) }
+        } catch (e: any) {
+            console.error(e)
+            setError(e.message || "Firebase not configured.")
+            setLoading(false)
+        }
     }, [])
+
+    if (error) return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+            <div className="text-2xl text-red-500 font-semibold tracking-wide text-center px-4 max-w-2xl">{error}</div>
+        </div>
+    )
 
     if (loading) return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center">
