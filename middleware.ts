@@ -32,7 +32,13 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Public routes — anyone can access
-    if (pathname === "/" || pathname === "/display" || pathname === "/login") {
+    if (
+        pathname === "/" ||
+        pathname === "/display" ||
+        pathname === "/login" ||
+        pathname.startsWith("/api/display") ||
+        pathname.startsWith("/api/register")
+    ) {
         return supabaseResponse;
     }
 
