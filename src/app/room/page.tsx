@@ -1,173 +1,212 @@
-"use client"
-import { useState, useEffect } from "react"
-import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { createClient } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
-export default function RoomDashboard() {
-    const [companies, setCompanies] = useState<any[]>([])
-    const [selectedCompany, setSelectedCompany] = useState<string>("")
-    const [tickets, setTickets] = useState<any[]>([])
-    const [candidates, setCandidates] = useState<Record<string, any>>({})
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+interface Company { id: string; name: string; room_number: string; interview_date: string }
+interface Registration { id: string; full_name: string; student_number: string; email: string; level: string }
+interface Ticket {
+    id: string; status: string; position: number; created_at: string;
+    registration?: Registration;
+}
 
-    // Fetch companies
+const STATUS_CONFIG: Record<string, { label: string; color: string; badge: string }> = {
+    pending: { label: "PENDING", color: "bg-amber-500/20 text-amber-300 border-amber-500/30", badge: "border-amber-500/30" },
+    called: { label: "CALLED", color: "bg-blue-500/20 text-blue-300 border-blue-500/30", badge: "border-blue-500/30" },
+    interviewing: { label: "INTERVIEWING", color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30", badge: "border-emerald-500/30" },
+};
+
+export default function RoomLeadDashboard() {
+    const [companies, setCompanies] = useState<Company[]>([]);
+    const [selectedCompany, setSelectedCompany] = useState("");
+    const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState<{ full_name: string } | null>(null);
+    const router = useRouter();
+    const supabase = createClient();
+
     useEffect(() => {
-        try {
-            const unsub = onSnapshot(collection(db, "companies"), (snapshot) => {
-                setCompanies(snapshot.docs.map(d => ({ id: d.id, ...d.data() })))
-                setLoading(false)
-            }, (err) => {
-                console.error("Firestore error:", err)
-                setError("Firestore Error: Please check your Firebase Security Rules (must be in Test Mode) or Vercel Environment Variables.")
-                setLoading(false)
-            })
-            return () => unsub()
-        } catch (e: any) {
-            console.error(e)
-            setError(e.message || "Firebase not configured.")
-            setLoading(false)
-        }
-    }, [])
+        const init = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { router.push("/login"); return; }
+            const { data: p } = await supabase.from("profiles").select("full_name, role").eq("id", user.id).single();
+            setProfile(p);
+            if (p?.role !== "room_lead" && p?.role !== "admin") { router.push("/login"); return; }
 
-    // Fetch tickets for selected company
+            const { data: comps } = await supabase.from("companies").select("*").order("name");
+            setCompanies(comps || []);
+            setLoading(false);
+        };
+        init();
+    }, []);
+
+    const fetchTickets = useCallback(async () => {
+        if (!selectedCompany) { setTickets([]); return; }
+        const { data } = await supabase
+            .from("queue_tickets")
+            .select("*, registration:registrations(id, full_name, student_number, email, level)")
+            .eq("company_id", selectedCompany)
+            .in("status", ["pending", "called", "interviewing"])
+            .order("position", { ascending: true });
+        setTickets(data || []);
+    }, [selectedCompany]);
+
+    useEffect(() => { fetchTickets(); }, [fetchTickets]);
+
+    // Real-time subscription
     useEffect(() => {
-        if (!selectedCompany) {
-            setTickets([])
-            return
-        }
+        if (!selectedCompany) return;
+        const channel = supabase
+            .channel("queue-realtime")
+            .on("postgres_changes", { event: "*", schema: "public", table: "queue_tickets", filter: `company_id=eq.${selectedCompany}` }, () => fetchTickets())
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [selectedCompany, fetchTickets]);
 
-        const q = query(
-            collection(db, "queue_tickets"),
-            where("company_id", "==", selectedCompany),
-            where("status", "in", ["pending", "called", "interviewing"])
-        )
+    const updateStatus = async (ticketId: string, status: string) => {
+        await supabase.from("queue_tickets").update({ status }).eq("id", ticketId);
+        await fetchTickets();
+    };
 
-        // Sort tickets manually on client based on timestamp to avoid needing a composite index for 'in' query
-        const unsub = onSnapshot(q, (snapshot) => {
-            const t = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-            t.sort((a: any, b: any) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0))
-            setTickets(t)
-        })
-        return () => unsub()
-    }, [selectedCompany])
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        router.push("/login");
+    };
 
-    // Fetch all active candidates for global status monitoring
-    useEffect(() => {
-        const unsub = onSnapshot(collection(db, "candidates"), (snapshot) => {
-            const cMap: Record<string, any> = {}
-            snapshot.docs.forEach(d => {
-                cMap[d.id] = { id: d.id, ...d.data() }
-            })
-            setCandidates(cMap)
-        })
-        return () => unsub()
-    }, [])
+    if (loading) return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+            <div className="text-slate-400 animate-pulse">Loading...</div>
+        </div>
+    );
 
-    const handleCall = async (ticketId: string) => {
-        await updateDoc(doc(db, "queue_tickets", ticketId), { status: "called" })
-    }
+    const activeTicket = tickets.find(t => t.status === "interviewing");
+    const queueTickets = tickets.filter(t => t.status !== "interviewing");
 
-    const handleStartInterview = async (ticketId: string, candidateId: string) => {
-        await updateDoc(doc(db, "queue_tickets", ticketId), { status: "interviewing" })
-        await updateDoc(doc(db, "candidates", candidateId), { status: "in_interview" })
-    }
-
-    const handleComplete = async (ticketId: string, candidateId: string) => {
-        await updateDoc(doc(db, "queue_tickets", ticketId), { status: "completed" })
-        await updateDoc(doc(db, "candidates", candidateId), { status: "waiting" })
-    }
-
-    const handleSkip = async (ticketId: string) => {
-        await updateDoc(doc(db, "queue_tickets", ticketId), { status: "skipped" })
-    }
-
-    if (error) return <div className="p-8 text-center text-red-500 font-medium max-w-lg mx-auto mt-20">{error}</div>
-    if (loading) return <div className="p-8 text-center text-slate-500 font-medium">Loading Database Connection...</div>
+    const selectedComp = companies.find(c => c.id === selectedCompany);
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-            <div className="max-w-4xl mx-auto space-y-6">
-                <Card className="shadow-md border-slate-200">
-                    <CardHeader className="bg-white rounded-t-xl border-b border-slate-100">
-                        <CardTitle className="text-xl md:text-2xl font-bold text-slate-900">Room Lead Dashboard</CardTitle>
-                        <p className="text-sm text-slate-500">Select your room to manage your candidate queue.</p>
-                    </CardHeader>
-                    <CardContent className="pt-6 bg-slate-50/50 rounded-b-xl">
-                        <select
-                            className="w-full h-12 px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
-                            value={selectedCompany}
-                            onChange={(e) => setSelectedCompany(e.target.value)}
-                        >
-                            <option value="">-- Select Company / Room --</option>
-                            {companies.map(c => (
-                                <option key={c.id} value={c.id}>{c.name} ({c.room_number})</option>
-                            ))}
-                        </select>
-                    </CardContent>
-                </Card>
+        <div className="min-h-screen bg-slate-950 font-sans">
+            {/* Header */}
+            <header className="bg-slate-900 border-b border-slate-700/50 px-4 md:px-8 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p className="text-white font-bold text-sm">Room Lead Dashboard</p>
+                        {profile && <p className="text-slate-400 text-xs">{profile.full_name}</p>}
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <a href="/board" target="_blank" className="text-xs text-slate-500 hover:text-slate-300 hidden sm:block transition-colors">Display Board ↗</a>
+                    <button onClick={handleSignOut} className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-all">Sign Out</button>
+                </div>
+            </header>
+
+            <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
+                {/* Company selector */}
+                <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-5">
+                    <label className="block text-sm font-semibold text-slate-300 mb-3">Select Your Company / Room</label>
+                    <select
+                        value={selectedCompany}
+                        onChange={e => setSelectedCompany(e.target.value)}
+                        className="w-full h-12 px-4 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    >
+                        <option value="">-- Select Company --</option>
+                        {companies.map(c => (
+                            <option key={c.id} value={c.id}>{c.name} · {c.room_number} ({c.interview_date === "2026-03-03" ? "Mar 3" : "Mar 4"})</option>
+                        ))}
+                    </select>
+                </div>
 
                 {selectedCompany && (
-                    <Card className="shadow-md border-slate-200">
-                        <CardHeader className="bg-white rounded-t-xl border-b border-slate-100">
-                            <CardTitle className="text-xl font-bold text-slate-900 flex items-center justify-between">
-                                <span>Smart Queue</span>
-                                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">{tickets.length} waiting</Badge>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-6 bg-slate-50/30">
-                            {tickets.length === 0 ? (
-                                <div className="text-slate-500 text-center py-10 bg-white rounded-lg border border-dashed border-slate-200">
-                                    <p className="text-lg">No candidates in your queue right now.</p>
+                    <>
+                        {/* Active interview */}
+                        {activeTicket && (
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span className="text-emerald-400 font-bold text-sm uppercase tracking-wide">Currently Interviewing</span>
                                 </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {tickets.map(ticket => {
-                                        const c = candidates[ticket.candidate_id]
-                                        const isBusy = c?.status === "in_interview" && ticket.status !== "interviewing"
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <h2 className="text-white text-2xl font-black">{activeTicket.registration?.full_name}</h2>
+                                        <p className="text-slate-400 text-sm mt-1">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => updateStatus(activeTicket.id, "completed")}
+                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20 transition-all whitespace-nowrap"
+                                    >
+                                        ✓ Mark Complete
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
-                                        return (
-                                            <div key={ticket.id} className={`flex flex-col md:flex-row items-center justify-between p-5 border rounded-xl transition-all duration-200 ${isBusy ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-blue-100 shadow-sm hover:shadow-md'}`}>
-                                                <div className="flex flex-col mb-4 md:mb-0 w-full md:w-auto">
-                                                    <div className="flex items-center space-x-3 mb-1">
-                                                        <h4 className={`text-lg font-bold ${isBusy ? 'text-slate-500' : 'text-slate-900'}`}>{ticket.candidate_name}</h4>
-                                                        <Badge variant={ticket.status === 'called' ? 'called' : ticket.status === 'interviewing' ? 'interviewing' : 'waiting'}>
-                                                            {ticket.status.toUpperCase()}
-                                                        </Badge>
-                                                        {isBusy && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">In another interview</Badge>}
-                                                    </div>
-                                                    <p className={`text-sm font-medium ${isBusy ? 'text-slate-400' : 'text-slate-500'}`}>Candidate Status: <span className="uppercase">{c?.status || "unknown"}</span></p>
+                        {/* Queue */}
+                        <div className="bg-slate-900 border border-slate-700/50 rounded-2xl overflow-hidden">
+                            <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
+                                <h3 className="text-white font-bold">
+                                    Queue for {selectedComp?.name}
+                                    <span className="ml-2 text-xs text-slate-400 font-normal">({selectedComp?.room_number})</span>
+                                </h3>
+                                <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full">{queueTickets.length} waiting</span>
+                            </div>
+                            <div className="divide-y divide-slate-700/30">
+                                {queueTickets.length === 0 ? (
+                                    <div className="text-center py-12 text-slate-500">No candidates in queue right now.</div>
+                                ) : queueTickets.map((ticket, i) => {
+                                    const isCalledOrPending = ticket.status === "pending" || ticket.status === "called";
+                                    return (
+                                        <div key={ticket.id} className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 ${i === 0 ? "bg-white/5" : ""}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-sm flex-shrink-0">
+                                                    {i + 1}
                                                 </div>
-
-                                                <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                                                    {ticket.status === 'pending' && (
-                                                        <>
-                                                            <Button size="lg" onClick={() => handleCall(ticket.id)} disabled={isBusy} className="flex-1 md:flex-none font-semibold">Call to Room</Button>
-                                                            <Button size="lg" variant="outline" onClick={() => handleSkip(ticket.id)} className="flex-1 md:flex-none text-slate-500 border-slate-200 bg-white hover:bg-slate-50">No Show (Skip)</Button>
-                                                        </>
-                                                    )}
-                                                    {ticket.status === 'called' && (
-                                                        <>
-                                                            <Button size="lg" onClick={() => handleStartInterview(ticket.id, ticket.candidate_id)} className="flex-1 md:flex-none bg-green-600 hover:bg-green-700 font-semibold shadow-sm shadow-green-600/20">Start Interview</Button>
-                                                            <Button size="lg" variant="outline" onClick={() => handleSkip(ticket.id)} className="flex-1 md:flex-none text-slate-500 border-slate-200 bg-white hover:bg-slate-50">No Show</Button>
-                                                        </>
-                                                    )}
-                                                    {ticket.status === 'interviewing' && (
-                                                        <Button size="lg" onClick={() => handleComplete(ticket.id, ticket.candidate_id)} className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 font-semibold shadow-sm shadow-purple-600/20">Mark Complete</Button>
-                                                    )}
+                                                <div>
+                                                    <p className="text-white font-semibold">{ticket.registration?.full_name}</p>
+                                                    <p className="text-slate-400 text-xs">{ticket.registration?.student_number} · {ticket.registration?.level}</p>
                                                 </div>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${STATUS_CONFIG[ticket.status]?.color}`}>
+                                                    {STATUS_CONFIG[ticket.status]?.label}
+                                                </span>
                                             </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                                            <div className="flex gap-2 w-full sm:w-auto">
+                                                {ticket.status === "pending" && (
+                                                    <>
+                                                        <button onClick={() => updateStatus(ticket.id, "called")} disabled={!!activeTicket}
+                                                            className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all">
+                                                            Call to Room
+                                                        </button>
+                                                        <button onClick={() => updateStatus(ticket.id, "skipped")}
+                                                            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-semibold text-sm transition-all">
+                                                            Skip
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {ticket.status === "called" && (
+                                                    <>
+                                                        <button onClick={() => updateStatus(ticket.id, "interviewing")} disabled={!!activeTicket}
+                                                            className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all">
+                                                            Start Interview
+                                                        </button>
+                                                        <button onClick={() => updateStatus(ticket.id, "skipped")}
+                                                            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-semibold text-sm transition-all">
+                                                            No Show
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
         </div>
-    )
+    );
 }

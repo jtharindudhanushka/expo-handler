@@ -1,105 +1,117 @@
-"use client"
-import { useState, useEffect } from "react"
-import { collection, query, where, onSnapshot } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { createClient } from "@/lib/supabase";
+
+interface CalledTicket {
+    id: string;
+    status: string;
+    registration?: { full_name: string; student_number: string };
+    company?: { name: string; room_number: string };
+}
 
 export default function PublicBoard() {
-    const [calledTickets, setCalledTickets] = useState<any[]>([])
-    const [companies, setCompanies] = useState<Record<string, any>>({})
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<string | null>(null)
+    const [tickets, setTickets] = useState<CalledTicket[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [time, setTime] = useState(new Date());
+    const supabase = createClient();
+
+    const fetchTickets = useCallback(async () => {
+        const { data } = await supabase
+            .from("queue_tickets")
+            .select("*, registration:registrations(full_name, student_number), company:companies(name, room_number)")
+            .in("status", ["called", "interviewing"])
+            .order("created_at", { ascending: false });
+        setTickets(data || []);
+        setLoading(false);
+    }, []);
 
     useEffect(() => {
-        try {
-            const unsub = onSnapshot(collection(db, "companies"), (snapshot) => {
-                const cMap: Record<string, any> = {}
-                snapshot.docs.forEach(d => {
-                    cMap[d.id] = { id: d.id, ...d.data() }
-                })
-                setCompanies(cMap)
-            })
-            return () => unsub()
-        } catch { }
-    }, [])
+        fetchTickets();
+        // Tick clock
+        const timer = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, [fetchTickets]);
 
+    // Real-time
     useEffect(() => {
-        try {
-            const q = query(
-                collection(db, "queue_tickets"),
-                where("status", "==", "called")
-            )
-
-            const unsub = onSnapshot(q, (snapshot) => {
-                const t = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-                t.sort((a: any, b: any) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0)) // Newest first
-                setCalledTickets(t)
-                setLoading(false)
-            }, (err) => {
-                console.error("Firestore error:", err)
-                setError("Firestore Error: Please check your Firebase Security Rules (must be in Test Mode) or Vercel Environment Variables.")
-                setLoading(false)
-            })
-            return () => unsub()
-        } catch (e: any) {
-            console.error(e)
-            setError(e.message || "Firebase not configured.")
-            setLoading(false)
-        }
-    }, [])
-
-    if (error) return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-            <div className="text-2xl text-red-500 font-semibold tracking-wide text-center px-4 max-w-2xl">{error}</div>
-        </div>
-    )
-
-    if (loading) return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-            <div className="text-3xl text-slate-400 animate-pulse font-semibold tracking-wide">Connecting to Queue...</div>
-        </div>
-    )
+        const channel = supabase
+            .channel("board-realtime")
+            .on("postgres_changes", { event: "*", schema: "public", table: "queue_tickets" }, () => fetchTickets())
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [fetchTickets]);
 
     return (
-        <div className="min-h-screen bg-slate-950 p-6 md:p-12 flex flex-col font-sans">
-            <header className="mb-12 text-center">
-                <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight drop-shadow-lg">NOW CALLING</h1>
-                <p className="text-xl md:text-2xl text-slate-400 mt-4 font-medium">Please proceed to your designated room</p>
+        <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+            {/* Top bar */}
+            <header className="bg-slate-900/80 backdrop-blur border-b border-slate-700/30 px-8 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.7)]" />
+                    <span className="text-slate-300 font-bold text-lg uppercase tracking-widest">Career Fair 2026 — Live Board</span>
+                </div>
+                <span className="text-slate-400 font-mono text-lg">
+                    {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
             </header>
 
-            <main className="flex-1 max-w-[1400px] mx-auto w-full">
-                {calledTickets.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/50">
-                        <p className="text-3xl text-slate-600 font-semibold tracking-wide">Waiting for next candidate...</p>
+            <div className="flex-1 p-6 md:p-12">
+                <div className="text-center mb-12">
+                    <h1 className="text-6xl md:text-8xl font-black text-white tracking-tight">NOW CALLING</h1>
+                    <p className="text-xl text-slate-400 mt-4">Please proceed to your designated room when your name appears</p>
+                </div>
+
+                {loading ? (
+                    <div className="text-slate-600 text-3xl font-bold text-center mt-24 animate-pulse">Connecting to live board...</div>
+                ) : tickets.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center mt-24 space-y-4">
+                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center">
+                            <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <p className="text-3xl text-slate-700 font-bold">Waiting for next candidate...</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-                        {calledTickets.map(ticket => {
-                            const comp = companies[ticket.company_id]
-                            return (
-                                <Card key={ticket.id} className="bg-slate-900 border-none shadow-2xl overflow-hidden ring-1 ring-white/10 hover:ring-blue-500/50 transition-all duration-300 transform hover:-translate-y-1">
-                                    <div className="bg-blue-600 px-6 py-4 flex items-center justify-between">
-                                        <span className="text-blue-100 font-bold uppercase tracking-widest text-sm">Proceed To</span>
-                                        <Badge className="bg-white text-blue-900 hover:bg-white border-0 text-lg md:text-xl font-black px-3 py-1 shadow-sm">
-                                            {comp?.room_number || "Room ??"}
-                                        </Badge>
+                    <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {tickets.map(ticket => (
+                            <div
+                                key={ticket.id}
+                                className={`rounded-3xl overflow-hidden shadow-2xl ring-1 transition-all duration-500 ${ticket.status === "interviewing"
+                                        ? "bg-emerald-950/50 ring-emerald-500/40 shadow-emerald-500/10"
+                                        : "bg-slate-900 ring-white/10 shadow-slate-900"
+                                    }`}
+                            >
+                                {/* Room badge header */}
+                                <div className={`px-6 py-4 flex items-center justify-between ${ticket.status === "interviewing" ? "bg-emerald-600" : "bg-indigo-600"}`}>
+                                    <span className="text-white/80 font-bold uppercase tracking-widest text-sm">
+                                        {ticket.status === "interviewing" ? "In Interview" : "Proceed To"}
+                                    </span>
+                                    <span className="text-white font-black text-2xl">{ticket.company?.room_number || "—"}</span>
+                                </div>
+
+                                <div className="p-8">
+                                    <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight truncate">
+                                        {ticket.registration?.full_name}
+                                    </h2>
+                                    <div className="mt-4 flex items-center gap-3">
+                                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${ticket.status === "interviewing" ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]"}`} />
+                                        <span className="text-2xl text-slate-300 font-bold">{ticket.company?.name}</span>
                                     </div>
-                                    <CardContent className="p-8">
-                                        <h2 className="text-4xl md:text-5xl font-black text-white mb-3 truncate tracking-tight">
-                                            {ticket.candidate_name}
-                                        </h2>
-                                        <p className="text-xl md:text-2xl text-slate-300 font-semibold flex items-center gap-3">
-                                            <span className="w-3 h-3 rounded-full bg-green-500 inline-block animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.7)]"></span>
-                                            {comp?.name || "Company"}
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
+                                    <p className="mt-2 text-slate-600 text-sm">{ticket.registration?.student_number}</p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
-            </main>
+            </div>
+
+            {/* Footer */}
+            <footer className="bg-slate-900/50 border-t border-slate-800 px-8 py-3 flex items-center justify-between">
+                <p className="text-slate-600 text-sm">Career Fair 2026 · Queue Management System</p>
+                <p className="text-slate-600 text-xs">
+                    {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                </p>
+            </footer>
         </div>
-    )
+    );
 }

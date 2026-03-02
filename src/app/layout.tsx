@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Career Fair Queue Management",
-  description: "Real-time queue management system for career fair rooms",
+  title: "Career Fair 2026 | Interview Queue Management",
+  description: "Real-time interview queue management system for Career Fair 2026. Register, manage queues, and track interview status.",
 };
 
 export default function RootLayout({
