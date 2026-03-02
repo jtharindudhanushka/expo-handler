@@ -1,116 +1,182 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
-interface CalledTicket {
+interface Ticket {
     id: string;
     status: string;
-    registration?: { full_name: string; student_number: string };
-    company?: { name: string; room_number: string };
+    position: number;
+    created_at: string;
+    registration_id: string;
+    company_id: string;
+    registration?: { full_name: string; student_number: string; level: string };
+    company?: { name: string };
 }
 
-export default function PublicBoard() {
-    const [tickets, setTickets] = useState<CalledTicket[]>([]);
+const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
+    pending: { label: "Waiting", cls: "bg-amber-500/20 text-amber-300 border-amber-500/40" },
+    called: { label: "Called", cls: "bg-blue-500/20 text-blue-300 border-blue-500/40" },
+    interviewing: { label: "In Interview", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
+};
+
+export default function WaitingRoomBoard() {
+    const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [time, setTime] = useState(new Date());
+    const [filter, setFilter] = useState<"all" | "pending" | "called" | "interviewing">("all");
+    const [search, setSearch] = useState("");
+    const [authed, setAuthed] = useState(false);
     const supabase = createClient();
+    const router = useRouter();
+    const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-    const fetchTickets = useCallback(async () => {
-        const { data } = await supabase
-            .from("queue_tickets")
-            .select("*, registration:registrations(full_name, student_number), company:companies(name, room_number)")
-            .in("status", ["called", "interviewing"])
-            .order("created_at", { ascending: false });
-        setTickets(data || []);
-        setLoading(false);
+    // Auth gate
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (!user) { router.push("/login"); return; }
+            setAuthed(true);
+        });
     }, []);
 
-    useEffect(() => {
-        fetchTickets();
-        // Tick clock
-        const timer = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, [fetchTickets]);
+    const fetchTickets = async () => {
+        const { data } = await supabase
+            .from("queue_tickets")
+            .select("id, status, position, created_at, registration_id, company_id, registration:registrations(full_name, student_number, level), company:companies(name)")
+            .in("status", ["pending", "called", "interviewing"])
+            .order("company_id")
+            .order("position", { ascending: true });
+        setTickets((data || []) as unknown as Ticket[]);
+        setLoading(false);
+    };
 
-    // Real-time
     useEffect(() => {
+        if (!authed) return;
+        fetchTickets();
+        const timer = setInterval(() => setTime(new Date()), 1000);
+
+        // Real-time subscription — use unique channel name to avoid stale subscriptions
+        const channelName = `board-${Date.now()}`;
         const channel = supabase
-            .channel("board-realtime")
-            .on("postgres_changes", { event: "*", schema: "public", table: "queue_tickets" }, () => fetchTickets())
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [fetchTickets]);
+            .channel(channelName)
+            .on("postgres_changes", {
+                event: "*",
+                schema: "public",
+                table: "queue_tickets",
+            }, () => { fetchTickets(); })
+            .subscribe((status) => {
+                console.log("Board realtime:", status);
+            });
+
+        channelRef.current = channel;
+        return () => {
+            clearInterval(timer);
+            channel.unsubscribe();
+        };
+    }, [authed]);
+
+    const filtered = tickets.filter(t => {
+        const matchStatus = filter === "all" || t.status === filter;
+        const matchSearch = !search || t.registration?.full_name.toLowerCase().includes(search.toLowerCase()) || t.registration?.student_number?.toLowerCase().includes(search.toLowerCase());
+        return matchStatus && matchSearch;
+    });
+
+    const counts = {
+        pending: tickets.filter(t => t.status === "pending").length,
+        called: tickets.filter(t => t.status === "called").length,
+        interviewing: tickets.filter(t => t.status === "interviewing").length,
+    };
+
+    if (!authed) return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+            <div className="text-slate-400 animate-pulse">Authenticating...</div>
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
-            {/* Top bar */}
-            <header className="bg-slate-900/80 backdrop-blur border-b border-slate-700/30 px-8 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.7)]" />
-                    <span className="text-slate-300 font-bold text-lg uppercase tracking-widest">Career Fair 2026 — Live Board</span>
+            {/* Header */}
+            <header className="bg-slate-900 border-b border-slate-700/50 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+                    <span className="text-white font-black text-base">Waiting Room Monitor</span>
+                    <span className="hidden sm:inline text-slate-500 text-sm">· Career Fair 2026</span>
                 </div>
-                <span className="text-slate-400 font-mono text-lg">
-                    {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                </span>
+                <div className="flex items-center gap-3">
+                    <span className="text-slate-400 font-mono text-sm tabular-nums">
+                        {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                    </span>
+                    <button onClick={() => { supabase.auth.signOut(); router.push("/login"); }}
+                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Sign Out</button>
+                </div>
             </header>
 
-            <div className="flex-1 p-6 md:p-12">
-                <div className="text-center mb-12">
-                    <h1 className="text-6xl md:text-8xl font-black text-white tracking-tight">NOW CALLING</h1>
-                    <p className="text-xl text-slate-400 mt-4">Please proceed to your designated room when your name appears</p>
+            {/* Stats bar */}
+            <div className="bg-slate-900/50 border-b border-slate-800 px-4 py-2 flex items-center gap-3 overflow-x-auto">
+                {(["all", "pending", "called", "interviewing"] as const).map(s => (
+                    <button
+                        key={s}
+                        onClick={() => setFilter(s)}
+                        className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === s ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
+                    >
+                        {s === "all" ? `All (${tickets.length})` : s === "pending" ? `⏳ Waiting (${counts.pending})` : s === "called" ? `📣 Called (${counts.called})` : `🟢 In Interview (${counts.interviewing})`}
+                    </button>
+                ))}
+                <div className="ml-auto flex-shrink-0">
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search name / ID..."
+                        className="w-40 sm:w-52 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
                 </div>
+            </div>
 
+            {/* Table */}
+            <div className="flex-1 overflow-auto">
                 {loading ? (
-                    <div className="text-slate-600 text-3xl font-bold text-center mt-24 animate-pulse">Connecting to live board...</div>
-                ) : tickets.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center mt-24 space-y-4">
-                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center">
-                            <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <p className="text-3xl text-slate-700 font-bold">Waiting for next candidate...</p>
-                    </div>
+                    <div className="text-slate-600 text-center py-20 animate-pulse">Loading queue data...</div>
+                ) : filtered.length === 0 ? (
+                    <div className="text-slate-600 text-center py-20 text-sm">No entries match your filter.</div>
                 ) : (
-                    <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {tickets.map(ticket => (
-                            <div
-                                key={ticket.id}
-                                className={`rounded-3xl overflow-hidden shadow-2xl ring-1 transition-all duration-500 ${ticket.status === "interviewing"
-                                        ? "bg-emerald-950/50 ring-emerald-500/40 shadow-emerald-500/10"
-                                        : "bg-slate-900 ring-white/10 shadow-slate-900"
-                                    }`}
-                            >
-                                {/* Room badge header */}
-                                <div className={`px-6 py-4 flex items-center justify-between ${ticket.status === "interviewing" ? "bg-emerald-600" : "bg-indigo-600"}`}>
-                                    <span className="text-white/80 font-bold uppercase tracking-widest text-sm">
-                                        {ticket.status === "interviewing" ? "In Interview" : "Proceed To"}
-                                    </span>
-                                    <span className="text-white font-black text-2xl">{ticket.company?.room_number || "—"}</span>
-                                </div>
-
-                                <div className="p-8">
-                                    <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight truncate">
-                                        {ticket.registration?.full_name}
-                                    </h2>
-                                    <div className="mt-4 flex items-center gap-3">
-                                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${ticket.status === "interviewing" ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]"}`} />
-                                        <span className="text-2xl text-slate-300 font-bold">{ticket.company?.name}</span>
-                                    </div>
-                                    <p className="mt-2 text-slate-600 text-sm">{ticket.registration?.student_number}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <table className="w-full text-sm min-w-[480px]">
+                        <thead className="sticky top-0 bg-slate-900 border-b border-slate-800">
+                            <tr>
+                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide w-8">#</th>
+                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide">Candidate</th>
+                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide hidden sm:table-cell">Level</th>
+                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide">Company</th>
+                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map((ticket, i) => (
+                                <tr key={ticket.id} className={`border-b border-slate-800/60 transition-colors ${ticket.status === "interviewing" ? "bg-emerald-500/5" : ticket.status === "called" ? "bg-blue-500/5" : "hover:bg-slate-800/40"}`}>
+                                    <td className="px-4 py-3 text-slate-500 text-xs tabular-nums">{i + 1}</td>
+                                    <td className="px-4 py-3">
+                                        <p className="text-white font-semibold leading-tight">{ticket.registration?.full_name}</p>
+                                        <p className="text-slate-500 text-xs mt-0.5">{ticket.registration?.student_number}</p>
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-400 text-xs hidden sm:table-cell">{ticket.registration?.level}</td>
+                                    <td className="px-4 py-3">
+                                        <span className="text-slate-300 font-medium text-xs">{ticket.company?.name}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold border ${STATUS_STYLE[ticket.status]?.cls}`}>
+                                            {ticket.status === "called" && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />}
+                                            {ticket.status === "interviewing" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                                            {STATUS_STYLE[ticket.status]?.label}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 )}
             </div>
 
-            {/* Footer */}
-            <footer className="bg-slate-900/50 border-t border-slate-800 px-8 py-3 flex items-center justify-between">
-                <p className="text-slate-600 text-sm">Career Fair 2026 · Queue Management System</p>
-                <p className="text-slate-600 text-xs">
-                    {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-                </p>
+            <footer className="bg-slate-900/50 border-t border-slate-800 px-4 py-2 text-center text-slate-600 text-xs">
+                {tickets.length} active · Live updating · {new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
             </footer>
         </div>
     );
