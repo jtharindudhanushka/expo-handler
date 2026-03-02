@@ -36,7 +36,7 @@ export default function DisplayBoard() {
     const [nowCalling, setNowCalling] = useState<{ name: string; company: string } | null>(null);
     const [calledVisible, setCalledVisible] = useState(true);
     const [time, setTime] = useState(new Date());
-    const prevCalledRef = useRef<string | null>(null);
+    const knownCalledTix = useRef<Set<string>>(new Set());
 
     // Stable supabase client
     const supabaseRef = useRef(createClient());
@@ -44,43 +44,52 @@ export default function DisplayBoard() {
 
     /* ── Data fetch ─────────────────────────────────────────── */
     const fetchData = useCallback(async () => {
-        const [{ data: comps }, { data: tickets }] = await Promise.all([
-            supabase.from("companies").select("id, name, interview_date").eq("interview_date", selectedDate).order("name"),
-            supabase.from("queue_tickets")
-                .select("company_id, status, registration:registrations(full_name, student_number)")
-                .in("status", ["pending", "called", "interviewing"]),
-        ]);
+        try {
+            const res = await fetch(`/api/display/live?date=${selectedDate}`);
+            if (!res.ok) return;
+            const { companies: comps, tickets } = await res.json();
 
-        const map: Record<string, CompanyCard> = {};
-        for (const c of comps ?? []) map[c.id] = { id: c.id, name: c.name, interviewing: null, called: null, pendingCount: 0 };
+            const map: Record<string, CompanyCard> = {};
+            for (const c of comps ?? []) map[c.id] = { id: c.id, name: c.name, interviewing: null, called: null, pendingCount: 0 };
 
-        let latestCalled: { name: string; company: string } | null = null;
+            let newCalledTicket: { name: string; company: string } | null = null;
+            const currentCalledIds = new Set<string>();
 
-        for (const t of tickets ?? []) {
-            if (!map[t.company_id]) continue;
-            const reg = (Array.isArray(t.registration) ? t.registration[0] : t.registration) as { full_name: string; student_number: string } | null;
-            if (t.status === "interviewing") map[t.company_id].interviewing = reg;
-            else if (t.status === "called") {
-                map[t.company_id].called = reg;
-                if (reg) latestCalled = { name: reg.full_name, company: map[t.company_id].name };
+            for (const t of tickets ?? []) {
+                if (!map[t.company_id]) continue;
+                const reg = (Array.isArray(t.registration) ? t.registration[0] : t.registration) as { full_name: string; student_number: string } | null;
+
+                if (t.status === "interviewing") {
+                    map[t.company_id].interviewing = reg;
+                } else if (t.status === "called") {
+                    map[t.company_id].called = reg;
+                    currentCalledIds.add(t.id);
+                    // Detect if this is a newly called ticket we haven't seen before
+                    if (reg && !knownCalledTix.current.has(t.id)) {
+                        newCalledTicket = { name: reg.full_name, company: map[t.company_id].name };
+                    }
+                } else if (t.status === "pending") {
+                    map[t.company_id].pendingCount++;
+                }
             }
-            else if (t.status === "pending") map[t.company_id].pendingCount++;
-        }
 
-        setCards(Object.values(map));
+            setCards(Object.values(map));
 
-        // Animate "Now Calling" when a new person is called
-        if (latestCalled && latestCalled.name !== prevCalledRef.current) {
-            prevCalledRef.current = latestCalled.name;
-            setCalledVisible(false);
-            setTimeout(() => {
-                setNowCalling(latestCalled);
-                setCalledVisible(true);
-            }, 400);
-        }
-        if (!latestCalled) {
-            prevCalledRef.current = null;
-            setNowCalling(null);
+            // Animate "Now Calling" when a new person is called
+            if (newCalledTicket) {
+                setCalledVisible(false);
+                setTimeout(() => {
+                    setNowCalling(newCalledTicket);
+                    setCalledVisible(true);
+                }, 400);
+            } else if (currentCalledIds.size === 0) {
+                setNowCalling(null);
+            }
+
+            // Sync our known called tickets state
+            knownCalledTix.current = currentCalledIds;
+        } catch (error) {
+            console.error("Fetch live data error:", error);
         }
     }, [selectedDate]);
 
@@ -172,14 +181,14 @@ export default function DisplayBoard() {
                         <div
                             key={c.id}
                             className={`flex flex-col rounded-2xl border-2 overflow-hidden transition-all duration-500 ${hasInterview ? "border-emerald-500/60 bg-emerald-950/40"
-                                    : hasCalled ? "border-indigo-500/60 bg-indigo-950/30"
-                                        : "border-slate-700/40 bg-slate-900/60"
+                                : hasCalled ? "border-indigo-500/60 bg-indigo-950/30"
+                                    : "border-slate-700/40 bg-slate-900/60"
                                 }`}
                         >
                             {/* Card header — company name & status */}
                             <div className={`flex-shrink-0 px-4 py-2.5 border-b flex items-center justify-between ${hasInterview ? "bg-emerald-700/30 border-emerald-600/30"
-                                    : hasCalled ? "bg-indigo-700/30 border-indigo-600/30"
-                                        : "bg-slate-800/60 border-slate-700/30"
+                                : hasCalled ? "bg-indigo-700/30 border-indigo-600/30"
+                                    : "bg-slate-800/60 border-slate-700/30"
                                 }`}>
                                 <p className="text-white font-black text-sm leading-tight truncate">{c.name}</p>
                                 <span className={`flex items-center gap-1.5 text-xs font-bold flex-shrink-0 ml-2 ${hasInterview ? "text-emerald-300" : hasCalled ? "text-indigo-300" : "text-slate-500"
