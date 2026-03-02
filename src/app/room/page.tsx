@@ -113,24 +113,20 @@ export default function RoomLeadDashboard() {
         return null;
     };
 
-    /**
-     * Recall a skipped/no-show ticket:
-     * Assigns a new position at the END of the current queue and sets back to pending.
-     */
     const recallTicket = async (ticket: Ticket) => {
         setConflict(null);
-        const { data: maxData } = await supabase
-            .from("queue_tickets")
-            .select("position")
-            .eq("company_id", selectedCompany)
-            .order("position", { ascending: false })
-            .limit(1);
-        const maxPos = maxData?.[0]?.position ?? 0;
-        await supabase
-            .from("queue_tickets")
-            .update({ status: "pending", position: maxPos + 1 })
-            .eq("id", ticket.id);
-        await fetchTickets();
+        try {
+            const res = await fetch("/api/room/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ticketId: ticket.id, newStatus: "pending", companyId: selectedCompany }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to recall ticket");
+            await fetchTickets();
+        } catch (err: any) {
+            alert(`Error recalling ticket: ${err.message}`);
+        }
     };
 
     const updateStatus = async (ticket: Ticket, newStatus: string) => {
@@ -148,22 +144,30 @@ export default function RoomLeadDashboard() {
             }
         }
 
-        // Run update directly — if the strict DB UNIQUE INDEX enforces a conflict, catch it
-        const { error } = await supabase.from("queue_tickets").update({ status: newStatus }).eq("id", ticket.id);
+        try {
+            const res = await fetch("/api/room/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ticketId: ticket.id, newStatus, companyId: selectedCompany }),
+            });
 
-        if (error) {
-            console.error("Update error:", error);
-            // 23505 is PostgreSQL uniqueviolation
-            if (error.code === "23505") {
-                setConflict({
-                    ticketId: ticket.id,
-                    msg: `${ticket.registration?.full_name} was just called or moved to interview by another room. Please refresh.`,
-                });
+            const data = await res.json();
+            if (!res.ok) {
+                // 23505 is PostgreSQL uniqueviolation
+                if (data.code === "23505" || (data.error && data.error.includes("duplicate key value"))) {
+                    setConflict({
+                        ticketId: ticket.id,
+                        msg: `${ticket.registration?.full_name} was just called or moved to interview by another room. Please refresh.`,
+                    });
+                } else {
+                    alert(`Error updating status: ${data.error}`);
+                }
             } else {
-                alert(`Error updating status: ${error.message}`);
+                await fetchTickets();
             }
-        } else {
-            await fetchTickets();
+        } catch (err: any) {
+            console.error("Update error:", err);
+            alert(`Error updating status: ${err.message}`);
         }
     };
 

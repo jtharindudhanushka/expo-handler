@@ -59,6 +59,8 @@ export default function RegistrationPage() {
     setSubmitting(true);
     setError(null);
 
+    const allCompanyIds = [...form.companies_march3, ...form.companies_march4];
+
     const insertData = {
       full_name: form.full_name,
       university: form.university,
@@ -73,24 +75,24 @@ export default function RegistrationPage() {
       companies_march4: form.companies_march4.map(id => companies.find(c => c.id === id)?.name).join(", "),
       job_opportunities: form.job_opportunities,
       cv_link: form.cv_link,
+      allCompanyIds: allCompanyIds,
     };
 
-    const { data: reg, error: regErr } = await supabase.from("registrations").insert(insertData).select().single();
-
-    if (regErr) {
-      setError(regErr.message);
-      setSubmitting(false);
-      return;
-    }
-
-    // Intelligently allocate queue positions via server-side API
-    const allCompanyIds = [...form.companies_march3, ...form.companies_march4];
-    if (allCompanyIds.length > 0) {
-      await fetch("/api/queue/allocate", {
+    try {
+      const response = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationId: reg.id, companyIds: allCompanyIds }),
+        body: JSON.stringify(insertData),
       });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to register");
+      }
+    } catch (err: any) {
+      setError(err.message || "Network error occurred.");
+      setSubmitting(false);
+      return;
     }
 
     setSubmitting(false);

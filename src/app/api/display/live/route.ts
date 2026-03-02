@@ -26,9 +26,21 @@ export async function GET(req: Request) {
                 .in("status", ["pending", "called", "interviewing"]),
         ]);
 
+        // Obfuscate student numbers before sending to public display
+        const safeTickets = (tickets || []).map(t => {
+            const reg: any = Array.isArray(t.registration) ? t.registration[0] : t.registration;
+            if (reg && typeof reg.student_number === "string" && reg.student_number.length > 2) {
+                const s = reg.student_number;
+                // e.g. "CB012345" -> "CB012***"
+                const visibleLen = Math.max(2, s.length - 3);
+                reg.student_number = s.substring(0, visibleLen) + "*".repeat(s.length - visibleLen);
+            }
+            return t;
+        });
+
         return NextResponse.json({
             companies: comps || [],
-            tickets: tickets || [],
+            tickets: safeTickets,
         }, {
             headers: {
                 "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
