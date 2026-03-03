@@ -123,7 +123,8 @@ export default function DisplayBoard() {
     useEffect(() => {
         fetchData();
         const clock = setInterval(() => setTime(new Date()), 1000);
-        const poll = setInterval(fetchData, 5000);
+        // Fallback polling interval reduced to 1.5s to fix the up to 8sec delay if Realtime is disabled on the DB table.
+        const poll = setInterval(fetchData, 1500);
 
         const ch = supabase
             .channel(`display-${selectedDate}-${Date.now()}`)
