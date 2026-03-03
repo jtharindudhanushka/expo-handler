@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { LogOut, MonitorUp, AlertCircle, CheckCircle2, Volume2, UserMinus, Plus, Sparkles, Building2 } from "lucide-react";
+import { LogOut, MonitorUp, AlertCircle, CheckCircle2, Volume2, UserMinus, Plus, Sparkles, Building2, Search } from "lucide-react";
 
 interface Company { id: string; name: string; interview_date: string }
 interface Registration { id: string; full_name: string; student_number: string; email: string; level: string; is_present: boolean; }
@@ -25,6 +25,7 @@ export default function RoomLeadDashboard() {
     const [skippedTickets, setSkippedTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [showPresentOnly, setShowPresentOnly] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
     const [profile, setProfile] = useState<{ full_name: string; role: string; company_id: string | null } | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [conflict, setConflict] = useState<{ ticketId: string; msg: string } | null>(null);
@@ -181,7 +182,16 @@ export default function RoomLeadDashboard() {
 
     const activeTickets = tickets.filter(t => t.status === "interviewing");
     const calledTickets = tickets.filter(t => t.status === "called");
-    const queueTickets = tickets.filter(t => t.status === "pending" && (!showPresentOnly || t.registration?.is_present));
+    const queueTickets = tickets.filter(t => {
+        if (t.status !== "pending") return false;
+        if (showPresentOnly && !t.registration?.is_present) return false;
+        if (searchQuery && t.registration) {
+            const lowerSearch = searchQuery.toLowerCase();
+            return t.registration.full_name?.toLowerCase().includes(lowerSearch) ||
+                t.registration.student_number?.toLowerCase().includes(lowerSearch);
+        }
+        return true;
+    });
     const selectedComp = companies.find(c => c.id === selectedCompany);
 
     return (
@@ -326,10 +336,22 @@ export default function RoomLeadDashboard() {
                                 </label>
                             </div>
 
+                            {/* Search Bar */}
+                            <div className="relative mb-5 group">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 transition-colors group-focus-within:text-blue-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by name or student ID..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full h-12 pl-11 pr-4 bg-[#131314] border border-gray-800/60 rounded-2xl text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all placeholder:text-gray-600"
+                                />
+                            </div>
+
                             <div className="bg-[#131314] border border-gray-800/60 rounded-[28px] overflow-hidden">
                                 {queueTickets.length === 0 ? (
                                     <div className="p-10 text-center">
-                                        <p className="text-sm text-gray-500 font-medium">No candidates in queue.</p>
+                                        <p className="text-sm text-gray-500 font-medium">No candidates found in queue.</p>
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-gray-800/50">

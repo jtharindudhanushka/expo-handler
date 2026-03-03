@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { Maximize, Minimize, Volume2, VolumeX, Sparkles, MonitorSmartphone } from "lucide-react";
 
 /* ─── Types ──────────────────────────────────────────────── */
-interface Company { id: string; name: string; interview_date: string }
+interface Company { id: string; name: string; interview_date: string; room_number: string; }
 interface ActiveTicket {
     company_id: string;
     status: string;
@@ -14,6 +14,7 @@ interface RegistrationView { full_name: string; student_number: string }
 interface CompanyCard {
     id: string;
     name: string;
+    room_number: string;
     interviewing: RegistrationView[];
     called: RegistrationView[];
     pendingCount: number;
@@ -55,7 +56,7 @@ export default function DisplayBoard() {
             const { companies: comps, tickets } = await res.json();
 
             const map: Record<string, CompanyCard> = {};
-            for (const c of comps ?? []) map[c.id] = { id: c.id, name: c.name, interviewing: [], called: [], pendingCount: 0 };
+            for (const c of comps ?? []) map[c.id] = { id: c.id, name: c.name, room_number: c.room_number, interviewing: [], called: [], pendingCount: 0 };
 
             let newAlerts: { id: string; name: string; company: string }[] = [];
             const currentCalledIds = new Set<string>();
@@ -268,8 +269,18 @@ export default function DisplayBoard() {
 
                             {/* Card Header Minimal */}
                             <div className={`px-6 py-4 flex items-center justify-between border-b ${isActive ? "border-gray-800/50 bg-[#25262B]/50" : "border-gray-800/30 bg-[#131314]/30"}`}>
-                                <h2 className={`font-semibold text-lg truncate ${isActive ? "text-gray-100" : "text-gray-400"}`}>{c.name}</h2>
-                                <div className="flex items-center gap-2">
+                                <h2 className={`font-semibold text-lg flex items-center gap-2 truncate ${isActive ? "text-gray-100" : "text-gray-400"}`}>
+                                    <span>{c.name}</span>
+                                    {c.room_number && (
+                                        <>
+                                            <span className="opacity-30 mx-1">—</span>
+                                            <span className="text-[#FBBF24] font-bold tracking-wide uppercase text-sm drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]">
+                                                {c.room_number.replace(/Room /i, 'ROOM ')}
+                                            </span>
+                                        </>
+                                    )}
+                                </h2>
+                                <div className="flex items-center gap-2 shrink-0">
                                     <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider w-fit flex items-center gap-2
                                         ${hasInterview ? "bg-green-500/10 text-green-400"
                                             : hasCalled ? "bg-blue-500/10 text-blue-400"
@@ -303,8 +314,10 @@ export default function DisplayBoard() {
                                             <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Current Session</p>
                                         </div>
                                         {c.interviewing.map((reg, idx) => (
-                                            <div key={idx} className="flex flex-col">
-                                                <p className="font-medium text-[22px] text-gray-100 tracking-tight leading-none truncate">{reg.full_name}</p>
+                                            <div key={idx} className="flex flex-col min-w-0">
+                                                <p className={`font-medium tracking-tight leading-none truncate text-gray-100 ${c.interviewing.length > 2 ? 'text-lg' : 'text-[22px]'}`}>
+                                                    {reg.full_name}
+                                                </p>
                                             </div>
                                         ))}
                                     </div>
@@ -312,14 +325,18 @@ export default function DisplayBoard() {
 
                                 {hasCalled && (
                                     <div className={`flex flex-col gap-3 ${hasInterview ? "mt-4 border-t border-gray-800/40 pt-4" : "mt-auto"}`}>
-                                        <div className="flex items-center gap-2">
-                                            <Volume2 className="w-4 h-4 text-blue-500 animate-pulse" />
-                                            <p className="text-[11px] font-bold text-blue-500 uppercase tracking-widest">Next Up to Room</p>
+                                        <div className={`flex items-center gap-2 ${hasInterview ? 'mt-2 border-t border-gray-800/40 pt-3' : 'mt-auto'}`}>
+                                            <Volume2 className="w-4 h-4 text-blue-500 animate-pulse shrink-0" />
+                                            <p className="text-[11px] font-bold text-blue-500 uppercase tracking-widest truncate">Next Up to Room</p>
                                         </div>
                                         {c.called.map((reg, idx) => (
-                                            <div key={idx} className="flex flex-col gap-1">
-                                                <p className="font-bold text-[22px] text-blue-400 truncate tracking-tight leading-none">{reg.full_name}</p>
-                                                <p className="text-gray-500 text-xs">{reg.student_number}</p>
+                                            <div key={idx} className="flex flex-col gap-1 min-w-0">
+                                                <p className={`font-bold text-blue-400 truncate tracking-tight leading-none ${c.called.length > 2 ? 'text-base' : 'text-xl'}`}>
+                                                    {reg.full_name}
+                                                </p>
+                                                {c.called.length <= 2 && (
+                                                    <p className="text-gray-500 text-xs truncate">{reg.student_number}</p>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
