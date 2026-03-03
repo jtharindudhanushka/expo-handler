@@ -10,11 +10,12 @@ interface ActiveTicket {
     status: string;
     person: { full_name: string; student_number: string } | null;
 }
+interface RegistrationView { full_name: string; student_number: string }
 interface CompanyCard {
     id: string;
     name: string;
-    interviewing: { full_name: string; student_number: string } | null;
-    called: { full_name: string; student_number: string } | null;
+    interviewing: RegistrationView[];
+    called: RegistrationView[];
     pendingCount: number;
 }
 
@@ -54,25 +55,27 @@ export default function DisplayBoard() {
             const { companies: comps, tickets } = await res.json();
 
             const map: Record<string, CompanyCard> = {};
-            for (const c of comps ?? []) map[c.id] = { id: c.id, name: c.name, interviewing: null, called: null, pendingCount: 0 };
+            for (const c of comps ?? []) map[c.id] = { id: c.id, name: c.name, interviewing: [], called: [], pendingCount: 0 };
 
             let newAlerts: { id: string; name: string; company: string }[] = [];
             const currentCalledIds = new Set<string>();
 
             for (const t of tickets ?? []) {
                 if (!map[t.company_id]) continue;
-                const reg = (Array.isArray(t.registration) ? t.registration[0] : t.registration) as { full_name: string; student_number: string } | null;
+                const reg = (Array.isArray(t.registration) ? t.registration[0] : t.registration) as RegistrationView | null;
 
-                if (t.status === "interviewing") {
-                    map[t.company_id].interviewing = reg;
-                } else if (t.status === "called") {
-                    map[t.company_id].called = reg;
-                    currentCalledIds.add(t.id);
-                    if (reg && !knownCalledTix.current.has(t.id)) {
-                        newAlerts.push({ id: t.id, name: reg.full_name, company: map[t.company_id].name });
+                if (reg) {
+                    if (t.status === "interviewing") {
+                        map[t.company_id].interviewing.push(reg);
+                    } else if (t.status === "called") {
+                        map[t.company_id].called.push(reg);
+                        currentCalledIds.add(t.id);
+                        if (!knownCalledTix.current.has(t.id)) {
+                            newAlerts.push({ id: t.id, name: reg.full_name, company: map[t.company_id].name });
+                        }
+                    } else if (t.status === "pending") {
+                        map[t.company_id].pendingCount++;
                     }
-                } else if (t.status === "pending") {
-                    map[t.company_id].pendingCount++;
                 }
             }
 
@@ -256,8 +259,8 @@ export default function DisplayBoard() {
                         <p className="text-lg font-medium">No schedule available for this date.</p>
                     </div>
                 ) : cards.map(c => {
-                    const hasInterview = !!c.interviewing;
-                    const hasCalled = !!c.called;
+                    const hasInterview = c.interviewing.length > 0;
+                    const hasCalled = c.called.length > 0;
                     const isActive = hasInterview || hasCalled;
 
                     return (
@@ -283,15 +286,15 @@ export default function DisplayBoard() {
                             </div>
 
                             {/* Card Body Ultra-Minimal */}
-                            <div className={`px-6 pt-5 pb-6 flex-1 flex flex-col justify-center gap-6 relative min-h-[160px] bg-transparent`}>
+                            <div className={`px-6 pt-5 pb-6 flex-1 flex flex-col justify-center gap-6 relative bg-transparent ${isActive ? "" : "min-h-[160px]"}`}>
                                 {!isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <p className="text-gray-700 font-medium text-sm">Waiting for candidates</p>
                                     </div>
                                 )}
 
-                                {c.interviewing && (
-                                    <div className="flex flex-col gap-1.5 flex-1">
+                                {hasInterview && (
+                                    <div className="flex flex-col gap-3">
                                         <div className="flex items-center gap-2">
                                             <span className="relative flex h-2 w-2">
                                                 <span className="animate-ping absolute h-full w-full rounded-full bg-green-500/50"></span>
@@ -299,18 +302,26 @@ export default function DisplayBoard() {
                                             </span>
                                             <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Current Session</p>
                                         </div>
-                                        <p className="font-medium text-[22px] text-gray-100 tracking-tight leading-none truncate">{c.interviewing.full_name}</p>
+                                        {c.interviewing.map((reg, idx) => (
+                                            <div key={idx} className="flex flex-col">
+                                                <p className="font-medium text-[22px] text-gray-100 tracking-tight leading-none truncate">{reg.full_name}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
-                                {c.called && (
-                                    <div className="flex flex-col gap-1.5 flex-1">
-                                        <div className="flex items-center gap-2 mt-auto">
+                                {hasCalled && (
+                                    <div className={`flex flex-col gap-3 ${hasInterview ? "mt-4 border-t border-gray-800/40 pt-4" : "mt-auto"}`}>
+                                        <div className="flex items-center gap-2">
                                             <Volume2 className="w-4 h-4 text-blue-500 animate-pulse" />
                                             <p className="text-[11px] font-bold text-blue-500 uppercase tracking-widest">Next Up to Room</p>
                                         </div>
-                                        <p className="font-bold text-[22px] text-blue-400 truncate tracking-tight leading-none">{c.called.full_name}</p>
-                                        <p className="text-gray-500 text-xs">{c.called.student_number}</p>
+                                        {c.called.map((reg, idx) => (
+                                            <div key={idx} className="flex flex-col gap-1">
+                                                <p className="font-bold text-[22px] text-blue-400 truncate tracking-tight leading-none">{reg.full_name}</p>
+                                                <p className="text-gray-500 text-xs">{reg.student_number}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>

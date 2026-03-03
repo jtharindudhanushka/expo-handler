@@ -178,8 +178,8 @@ export default function RoomLeadDashboard() {
         </div>
     );
 
-    const activeTicket = tickets.find(t => t.status === "interviewing");
-    const calledTicket = tickets.find(t => t.status === "called");
+    const activeTickets = tickets.filter(t => t.status === "interviewing");
+    const calledTickets = tickets.filter(t => t.status === "called");
     const queueTickets = tickets.filter(t => t.status === "pending");
     const selectedComp = companies.find(c => c.id === selectedCompany);
 
@@ -248,8 +248,8 @@ export default function RoomLeadDashboard() {
                         {/* Metrics Layout */}
                         <div className="grid grid-cols-3 gap-3">
                             {[
-                                { label: "In Session", value: activeTicket ? 1 : 0 },
-                                { label: "At Door", value: calledTicket ? 1 : 0 },
+                                { label: "In Session", value: activeTickets.length },
+                                { label: "At Door", value: calledTickets.length },
                                 { label: "Waiting", value: queueTickets.length },
                             ].map(metric => (
                                 <div key={metric.label} className="bg-[#131314] border border-gray-800/60 rounded-[20px] p-5 flex flex-col items-center justify-center transition-colors hover:bg-[#1A1B1E]">
@@ -262,9 +262,9 @@ export default function RoomLeadDashboard() {
                         {/* Active Operations Area */}
                         <div className="space-y-4">
 
-                            {/* Currently Interviewing Card - Flattened */}
-                            {activeTicket && (
-                                <div className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-all border-b border-gray-800/40 pb-6">
+                            {/* Currently Interviewing Cards - Flattened */}
+                            {activeTickets.map(activeTicket => (
+                                <div key={activeTicket.id} className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-all border-b border-gray-800/40 pb-6">
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="relative flex h-2 w-2">
@@ -281,11 +281,11 @@ export default function RoomLeadDashboard() {
                                         <CheckCircle2 className="w-4 h-4" /> Complete
                                     </button>
                                 </div>
-                            )}
+                            ))}
 
-                            {/* Called Ticket Card (Walking to room) - Flattened */}
-                            {calledTicket && (
-                                <div className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-all">
+                            {/* Called Ticket Cards (Walking to room) - Flattened */}
+                            {calledTickets.map(calledTicket => (
+                                <div key={calledTicket.id} className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-all border-b border-gray-800/40 pb-6">
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex items-center gap-2 mb-1">
                                             <Volume2 className="w-4 h-4 text-blue-500 animate-pulse" />
@@ -295,8 +295,8 @@ export default function RoomLeadDashboard() {
                                         <p className="text-[13px] text-gray-500 font-medium">{calledTicket.registration?.student_number}</p>
                                     </div>
                                     <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-2 sm:mt-0">
-                                        <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
-                                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-20 disabled:grayscale text-white rounded-xl text-sm font-medium transition-all shadow-sm">
+                                        <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-all shadow-sm">
                                             Begin <span className="hidden sm:inline">Session</span>
                                         </button>
                                         <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
@@ -305,7 +305,7 @@ export default function RoomLeadDashboard() {
                                         </button>
                                     </div>
                                 </div>
-                            )}
+                            ))}
 
                         </div>
 
@@ -334,13 +334,11 @@ export default function RoomLeadDashboard() {
                                                 </div>
 
                                                 <div className="flex gap-2.5 w-full sm:w-auto pl-12 sm:pl-0">
-                                                    {/* Strict Logic Requirement: Only show "Call" if no one is currently called */}
-                                                    {!calledTicket && (
-                                                        <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
-                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
-                                                            Call Next
-                                                        </button>
-                                                    )}
+                                                    {/* Concurrency allowed: Call Next is always visible */}
+                                                    <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
+                                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
+                                                        Call Next
+                                                    </button>
                                                     <button onClick={() => { if (confirm(`Skip ${ticket.registration?.full_name}?`)) updateStatus(ticket, "skipped"); }}
                                                         className="flex-1 sm:flex-none px-6 py-2.5 text-gray-300 hover:text-white bg-[#1E1F22] hover:bg-[#25262B] border border-gray-800 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
                                                         Skip
