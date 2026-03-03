@@ -198,7 +198,7 @@ export default function DisplayBoard() {
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                                 </span>
-                                <span className="text-blue-300 text-xs font-bold uppercase tracking-widest shrink-0">Now Calling</span>
+                                <span className="text-blue-300 text-[10px] font-bold uppercase tracking-widest shrink-0">Please proceed to room</span>
                                 <span className="text-white font-medium text-xl truncate ml-1">{nowCalling.name}</span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0 ml-4">
