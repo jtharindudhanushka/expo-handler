@@ -225,8 +225,8 @@ export default function DisplayBoard() {
                                 </div>
                             </div>
 
-                            {/* Card Body Minimal */}
-                            <div className={`p-6 flex-1 flex flex-col justify-center gap-3 relative min-h-[140px] ${isActive ? 'bg-[#1E1F22]' : 'bg-transparent'}`}>
+                            {/* Card Body Ultra-Minimal */}
+                            <div className={`px-6 pt-5 pb-6 flex-1 flex flex-col justify-center gap-6 relative min-h-[160px] bg-transparent`}>
                                 {!isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <p className="text-gray-700 font-medium text-sm">Waiting for candidates</p>
@@ -234,21 +234,26 @@ export default function DisplayBoard() {
                                 )}
 
                                 {c.interviewing && (
-                                    <div className={`rounded-xl px-5 py-4 relative bg-[#1A1B1E]`}>
-                                        <p className={`text-[11px] font-medium tracking-wide mb-1 flex items-center gap-1.5 ${hasCalled ? 'text-gray-500' : 'text-green-500/80'}`}>
-                                            Current Session
-                                        </p>
-                                        <p className={`font-medium truncate tracking-tight ${hasCalled ? 'text-xl text-gray-400' : 'text-2xl text-gray-100'}`}>{c.interviewing.full_name}</p>
+                                    <div className="flex flex-col gap-1.5 flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute h-full w-full rounded-full bg-green-500/50"></span>
+                                                <span className="relative rounded-full h-2 w-2 bg-green-500"></span>
+                                            </span>
+                                            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Current Session</p>
+                                        </div>
+                                        <p className="font-medium text-[22px] text-gray-100 tracking-tight leading-none truncate">{c.interviewing.full_name}</p>
                                     </div>
                                 )}
 
                                 {c.called && (
-                                    <div className="rounded-xl px-5 py-4 bg-blue-500/5 border border-blue-500/10 relative">
-                                        <p className="text-[11px] font-medium text-blue-400/80 tracking-wide mb-1 flex items-center gap-1.5">
-                                            <Volume2 className="w-3.5 h-3.5 animate-pulse" /> Next Up
-                                        </p>
-                                        <p className="font-medium text-xl text-white truncate tracking-tight mb-0.5">{c.called.full_name}</p>
-                                        <p className="text-gray-500 text-xs truncate">{c.called.student_number}</p>
+                                    <div className="flex flex-col gap-1.5 flex-1">
+                                        <div className="flex items-center gap-2 mt-auto">
+                                            <Volume2 className="w-4 h-4 text-blue-500 animate-pulse" />
+                                            <p className="text-[11px] font-bold text-blue-500 uppercase tracking-widest">Next Up to Room</p>
+                                        </div>
+                                        <p className="font-bold text-[22px] text-blue-400 truncate tracking-tight leading-none">{c.called.full_name}</p>
+                                        <p className="text-gray-500 text-xs">{c.called.student_number}</p>
                                     </div>
                                 )}
                             </div>

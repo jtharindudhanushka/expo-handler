@@ -262,51 +262,47 @@ export default function RoomLeadDashboard() {
                         {/* Active Operations Area */}
                         <div className="space-y-4">
 
-                            {/* Currently Interviewing Card */}
+                            {/* Currently Interviewing Card - Flattened */}
                             {activeTicket && (
-                                <div className="bg-[#1A1B1E] rounded-2xl p-6 relative overflow-hidden group transition-all">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <span className="relative flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500/50 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                        </span>
-                                        <span className="text-[11px] font-medium text-green-500/80 tracking-wide">In Session</span>
-                                    </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                                        <div>
-                                            <h3 className="text-xl font-medium text-gray-100">{activeTicket.registration?.full_name}</h3>
-                                            <p className="text-[13px] text-gray-500 mt-1">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
+                                <div className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-all border-b border-gray-800/40 pb-6">
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500/50 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                            </span>
+                                            <span className="text-[11px] font-bold text-gray-500 tracking-widest uppercase">Currently In Session</span>
                                         </div>
-                                        <button onClick={() => { if (confirm("Mark interview as completed?")) updateStatus(activeTicket, "completed"); }}
-                                            className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 bg-[#25262B] hover:bg-[#2C2D33] text-gray-300 rounded-xl text-sm font-medium transition-all">
-                                            <CheckCircle2 className="w-4 h-4" /> Complete
-                                        </button>
+                                        <h3 className="text-2xl font-medium text-gray-100 tracking-tight">{activeTicket.registration?.full_name}</h3>
+                                        <p className="text-[13px] text-gray-500 font-medium">{activeTicket.registration?.student_number} <span className="mx-1.5 opacity-40">|</span> {activeTicket.registration?.level}</p>
                                     </div>
+                                    <button onClick={() => { if (confirm("Mark interview as completed?")) updateStatus(activeTicket, "completed"); }}
+                                        className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3.5 sm:py-3 bg-[#1E1F22] hover:bg-[#25262B] border border-gray-800 text-gray-200 rounded-xl text-sm font-medium transition-all shadow-sm">
+                                        <CheckCircle2 className="w-4 h-4" /> Complete
+                                    </button>
                                 </div>
                             )}
 
-                            {/* Called Ticket Card (Walking to room) */}
+                            {/* Called Ticket Card (Walking to room) - Flattened */}
                             {calledTicket && (
-                                <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-6 relative transition-all">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <Volume2 className="w-4 h-4 text-blue-400/80 animate-pulse" />
-                                        <span className="text-[11px] font-medium text-blue-400/80 tracking-wide">Arriving Next</span>
+                                <div className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-6 transition-all">
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Volume2 className="w-4 h-4 text-blue-500 animate-pulse" />
+                                            <span className="text-[11px] font-bold text-blue-500 tracking-widest uppercase">Arriving Next</span>
+                                        </div>
+                                        <h3 className="text-2xl font-medium text-gray-100 tracking-tight">{calledTicket.registration?.full_name}</h3>
+                                        <p className="text-[13px] text-gray-500 font-medium">{calledTicket.registration?.student_number}</p>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                                        <div>
-                                            <h3 className="text-xl font-medium text-gray-100">{calledTicket.registration?.full_name}</h3>
-                                            <p className="text-[13px] text-gray-500 mt-1">{calledTicket.registration?.student_number}</p>
-                                        </div>
-                                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                                            <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
-                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-20 disabled:grayscale text-white rounded-xl text-sm font-medium transition-all">
-                                                Begin <span className="hidden sm:inline">Session</span>
-                                            </button>
-                                            <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
-                                                className="flex items-center justify-center gap-2 px-4 py-3 text-gray-500 hover:text-gray-300 hover:bg-[#25262B] rounded-xl transition-colors">
-                                                <UserMinus className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+                                        <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-20 disabled:grayscale text-white rounded-xl text-sm font-medium transition-all shadow-sm">
+                                            Begin <span className="hidden sm:inline">Session</span>
+                                        </button>
+                                        <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
+                                            className="flex items-center justify-center gap-2 px-5 py-3.5 sm:py-3 text-gray-400 hover:text-gray-200 hover:bg-[#1E1F22] border border-transparent hover:border-gray-800 rounded-xl transition-all">
+                                            <UserMinus className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
                             )}
