@@ -191,24 +191,13 @@ export default function DisplayBoard() {
 
                 {/* "NOW CALLING" Hero */}
                 <div className={`flex-1 min-w-0 mx-4 transition-all duration-500 ${calledVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}`}>
-                    {nowCalling ? (
-                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-full px-5 py-2.5 flex items-center justify-between max-w-2xl mx-auto shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <span className="relative flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                                </span>
-                                <span className="text-blue-300 text-[10px] font-bold uppercase tracking-widest shrink-0">Please proceed to room</span>
-                                <span className="text-white font-medium text-xl truncate ml-1">{nowCalling.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0 ml-4">
-                                <span className="text-blue-400/80 font-medium">to</span>
-                                <span className="bg-[#1E1F22] border border-blue-500/30 text-blue-300 px-4 py-1 rounded-full text-sm font-medium">{nowCalling.company}</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center text-gray-500 text-sm font-medium">Please proceed to your room when the name appears</div>
-                    )}
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-full px-8 py-3 flex items-center justify-center max-w-2xl mx-auto shadow-[0_0_15px_rgba(59,130,246,0.1)] gap-4 w-full">
+                        <span className="relative flex h-3.5 w-3.5 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-500"></span>
+                        </span>
+                        <span className="text-white text-lg font-bold tracking-widest uppercase">Please proceed to room</span>
+                    </div>
                 </div>
 
                 {/* Clock & Fullscreen */}
