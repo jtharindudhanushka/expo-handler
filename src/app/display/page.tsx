@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { Maximize, Minimize, Volume2, Sparkles, MonitorSmartphone } from "lucide-react";
+import { Maximize, Minimize, Volume2, VolumeX, Sparkles, MonitorSmartphone } from "lucide-react";
 
 /* ─── Types ──────────────────────────────────────────────── */
 interface Company { id: string; name: string; interview_date: string }
@@ -37,6 +37,7 @@ export default function DisplayBoard() {
     const [calledVisible, setCalledVisible] = useState(true);
     const [alertQueue, setAlertQueue] = useState<{ id: string; name: string; company: string }[]>([]);
     const [isAlerting, setIsAlerting] = useState(false);
+    const [soundEnabled, setSoundEnabled] = useState(false);
     const [time, setTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const knownCalledTix = useRef<Set<string>>(new Set());
@@ -99,8 +100,10 @@ export default function DisplayBoard() {
             const currentAlert = alertQueue[0];
 
             // Play sound effect
-            const audio = new Audio('/sfx/alert.mp3');
-            audio.play().catch(e => console.log('Audio autoplay blocked:', e));
+            if (soundEnabled) {
+                const audio = new Audio('/sfx/alert.mp3');
+                audio.play().catch(e => console.log('Audio autoplay blocked:', e));
+            }
 
             // Fade out current ticket, fade in new ticket
             setCalledVisible(false);
@@ -207,6 +210,19 @@ export default function DisplayBoard() {
                         <p className="font-mono text-2xl text-gray-100 font-medium tabular-nums tracking-tight">{time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</p>
                         <p className="text-gray-500 text-xs font-medium">{time.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                     </div>
+                    <button
+                        onClick={() => {
+                            setSoundEnabled(!soundEnabled);
+                            // Pre-warm the audio context on first click
+                            if (!soundEnabled) {
+                                new Audio('/sfx/alert.mp3').play().catch(() => { });
+                            }
+                        }}
+                        className={`p-2.5 rounded-full transition-colors border ${soundEnabled ? "bg-blue-500/10 border-blue-500/30 text-blue-400" : "bg-[#1E1F22] hover:bg-gray-800 text-gray-500 border-gray-800/50"}`}
+                        title="Toggle Sound"
+                    >
+                        {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                    </button>
                     <button
                         onClick={toggleFullscreen}
                         className="p-2.5 rounded-full bg-[#1E1F22] hover:bg-gray-800 text-gray-400 transition-colors border border-gray-800/50"
