@@ -296,8 +296,8 @@ export default function DisplayBoard() {
                                 </div>
                             </div>
 
-                            {/* Card Body Ultra-Minimal */}
-                            <div className={`px-6 pt-5 pb-6 flex-1 flex flex-col justify-center gap-6 relative bg-transparent ${isActive ? "" : "min-h-[160px]"}`}>
+                            {/* Card Body Scalable Wrap */}
+                            <div className={`px-5 py-4 flex-1 flex flex-col gap-4 relative bg-transparent ${isActive ? "" : "min-h-[160px] justify-center"}`}>
                                 {!isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <p className="text-gray-700 font-medium text-sm">Waiting for candidates</p>
@@ -305,40 +305,44 @@ export default function DisplayBoard() {
                                 )}
 
                                 {hasInterview && (
-                                    <div className="flex flex-col gap-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="relative flex h-2 w-2">
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="relative flex h-2 w-2 shrink-0">
                                                 <span className="animate-ping absolute h-full w-full rounded-full bg-green-500/50"></span>
                                                 <span className="relative rounded-full h-2 w-2 bg-green-500"></span>
                                             </span>
-                                            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Current Session</p>
+                                            <p className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-widest shrink-0">Current Session</p>
                                         </div>
-                                        {c.interviewing.map((reg, idx) => (
-                                            <div key={idx} className="flex flex-col min-w-0">
-                                                <p className={`font-medium tracking-tight leading-none truncate text-gray-100 ${c.interviewing.length > 2 ? 'text-lg' : 'text-[22px]'}`}>
-                                                    {reg.full_name}
-                                                </p>
-                                            </div>
-                                        ))}
+                                        <div className={`grid gap-2 ${c.interviewing.length > 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                                            {c.interviewing.map((reg, idx) => (
+                                                <div key={idx} className="flex flex-col min-w-0">
+                                                    <p className={`font-medium tracking-tight leading-snug text-gray-100 break-words ${c.interviewing.length + c.called.length >= 4 ? 'text-sm' : c.interviewing.length > 2 ? 'text-base' : 'text-lg sm:text-[20px]'}`}>
+                                                        {reg.full_name}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
 
                                 {hasCalled && (
-                                    <div className={`flex flex-col gap-3 ${hasInterview ? "mt-4 border-t border-gray-800/40 pt-4" : "mt-auto"}`}>
-                                        <div className={`flex items-center gap-2 ${hasInterview ? 'mt-2 border-t border-gray-800/40 pt-3' : 'mt-auto'}`}>
-                                            <Volume2 className="w-4 h-4 text-blue-500 animate-pulse shrink-0" />
-                                            <p className="text-[11px] font-bold text-blue-500 uppercase tracking-widest truncate">Next Up to Room</p>
+                                    <div className={`flex flex-col gap-2 ${hasInterview ? "mt-2 pt-3 border-t border-gray-800/40" : "mt-auto"}`}>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Volume2 className="w-3.5 h-3.5 text-blue-500 animate-pulse shrink-0" />
+                                            <p className="text-[10px] sm:text-[11px] font-bold text-blue-500 uppercase tracking-widest shrink-0">Next Up to Room</p>
                                         </div>
-                                        {c.called.map((reg, idx) => (
-                                            <div key={idx} className="flex flex-col gap-1 min-w-0">
-                                                <p className={`font-bold text-blue-400 truncate tracking-tight leading-none ${c.called.length > 2 ? 'text-base' : 'text-xl'}`}>
-                                                    {reg.full_name}
-                                                </p>
-                                                {c.called.length <= 2 && (
-                                                    <p className="text-gray-500 text-xs truncate">{reg.student_number}</p>
-                                                )}
-                                            </div>
-                                        ))}
+                                        <div className={`grid gap-2 sm:gap-3 ${c.called.length > 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                                            {c.called.map((reg, idx) => (
+                                                <div key={idx} className="flex flex-col gap-0.5 min-w-0">
+                                                    <p className={`font-semibold text-blue-400 tracking-tight leading-snug break-words ${c.interviewing.length + c.called.length >= 4 ? 'text-sm' : c.called.length > 2 ? 'text-base' : 'text-lg sm:text-[19px]'}`}>
+                                                        {reg.full_name}
+                                                    </p>
+                                                    {c.interviewing.length + c.called.length < 4 && (
+                                                        <p className="text-gray-500 text-[11px] truncate">{reg.student_number}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </div>
