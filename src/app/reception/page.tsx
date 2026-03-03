@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { LogOut, Search, UserCheck, UserX, Sparkles, Building2 } from "lucide-react";
+import { LogOut, Search, UserCheck, UserX, Sparkles, Building2, Download } from "lucide-react";
 
 interface Registration {
     id: string;
@@ -114,6 +114,29 @@ export default function ReceptionDashboard() {
     const totalCount = registrations.length;
     const presentCount = registrations.filter(r => r.is_present).length;
 
+    const downloadCSV = () => {
+        const headers = ["Name", "Student Number", "Email", "Level", "Is Present"];
+        const csvRows = [
+            headers.join(","),
+            ...filteredRegs.map(r => [
+                `"${r.full_name?.replace(/"/g, '""') || ''}"`,
+                `"${r.student_number?.replace(/"/g, '""') || ''}"`,
+                `"${r.email?.replace(/"/g, '""') || ''}"`,
+                `"${r.level?.replace(/"/g, '""') || ''}"`,
+                r.is_present ? "Yes" : "No"
+            ].join(","))
+        ];
+
+        const csvString = csvRows.join("\n");
+        const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Reception_Attendance_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="min-h-screen bg-[#0A0A0B] text-gray-100 font-sans selection:bg-blue-500/30">
             {/* Topbar */}
@@ -166,6 +189,9 @@ export default function ReceptionDashboard() {
                                 {f}
                             </button>
                         ))}
+                        <button onClick={downloadCSV} className="flex items-center gap-2 px-5 h-12 rounded-2xl text-[11px] font-bold uppercase tracking-widest transition-all bg-[#1E1F22] border border-gray-800 text-gray-300 hover:text-white hover:bg-[#25262B] group">
+                            <Download className="w-4 h-4 group-hover:scale-110 transition-transform" /> <span className="hidden sm:inline">Export CSV</span>
+                        </button>
                     </div>
                 </div>
 
