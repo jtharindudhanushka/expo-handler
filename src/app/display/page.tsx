@@ -43,12 +43,6 @@ export default function DisplayBoard() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const knownCalledTix = useRef<Set<string>>(new Set());
 
-    // Initialize audio only on client side
-    useEffect(() => {
-        audioRef.current = new Audio('/sfx/alert.mp3');
-        audioRef.current.load();
-    }, []);
-
     const supabaseRef = useRef(createClient());
     const supabase = supabaseRef.current;
 
@@ -224,11 +218,16 @@ export default function DisplayBoard() {
                             // Pre-warm the persistent audio context on first click
                             if (!soundEnabled && audioRef.current) {
                                 audioRef.current.volume = 0; // mute the initial ping
-                                audioRef.current.play().then(() => {
-                                    audioRef.current!.pause();
-                                    audioRef.current!.currentTime = 0;
-                                    audioRef.current!.volume = 1; // restore volume for actual alerts
-                                }).catch(() => { });
+                                const playPromise = audioRef.current.play();
+                                if (playPromise !== undefined) {
+                                    playPromise.then(() => {
+                                        if (audioRef.current) {
+                                            audioRef.current.pause();
+                                            audioRef.current.currentTime = 0;
+                                            audioRef.current.volume = 1; // restore volume for actual alerts
+                                        }
+                                    }).catch(() => { });
+                                }
                             }
                         }}
                         className={`p-2.5 rounded-full transition-colors border ${soundEnabled ? "bg-blue-500/10 border-blue-500/30 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]" : "bg-[#1E1F22] hover:bg-gray-800 text-gray-500 border-gray-800/50"}`}
@@ -245,6 +244,9 @@ export default function DisplayBoard() {
                     </button>
                 </div>
             </header>
+
+            {/* Hidden Audio Element for reliable playback */}
+            <audio ref={audioRef} src="/sfx/alert.mp3" preload="auto" />
 
             {/* ── Main Grid ───────────────────────────────────────── */}
             <div className={`flex-1 min-h-0 p-6 grid ${cols} gap-6 overflow-y-auto`}>
