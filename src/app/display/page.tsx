@@ -38,9 +38,16 @@ export default function DisplayBoard() {
     const [alertQueue, setAlertQueue] = useState<{ id: string; name: string; company: string }[]>([]);
     const [isAlerting, setIsAlerting] = useState(false);
     const [soundEnabled, setSoundEnabled] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     const [time, setTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const knownCalledTix = useRef<Set<string>>(new Set());
+
+    // Initialize audio only on client side
+    useEffect(() => {
+        audioRef.current = new Audio('/sfx/alert.mp3');
+        audioRef.current.load();
+    }, []);
 
     const supabaseRef = useRef(createClient());
     const supabase = supabaseRef.current;
@@ -100,9 +107,9 @@ export default function DisplayBoard() {
             const currentAlert = alertQueue[0];
 
             // Play sound effect
-            if (soundEnabled) {
-                const audio = new Audio('/sfx/alert.mp3');
-                audio.play().catch(e => console.log('Audio autoplay blocked:', e));
+            if (soundEnabled && audioRef.current) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.play().catch(e => console.log('Audio autoplay blocked:', e));
             }
 
             // Fade out current ticket, fade in new ticket
@@ -214,13 +221,18 @@ export default function DisplayBoard() {
                     <button
                         onClick={() => {
                             setSoundEnabled(!soundEnabled);
-                            // Pre-warm the audio context on first click
-                            if (!soundEnabled) {
-                                new Audio('/sfx/alert.mp3').play().catch(() => { });
+                            // Pre-warm the persistent audio context on first click
+                            if (!soundEnabled && audioRef.current) {
+                                audioRef.current.volume = 0; // mute the initial ping
+                                audioRef.current.play().then(() => {
+                                    audioRef.current!.pause();
+                                    audioRef.current!.currentTime = 0;
+                                    audioRef.current!.volume = 1; // restore volume for actual alerts
+                                }).catch(() => { });
                             }
                         }}
-                        className={`p-2.5 rounded-full transition-colors border ${soundEnabled ? "bg-blue-500/10 border-blue-500/30 text-blue-400" : "bg-[#1E1F22] hover:bg-gray-800 text-gray-500 border-gray-800/50"}`}
-                        title="Toggle Sound"
+                        className={`p-2.5 rounded-full transition-colors border ${soundEnabled ? "bg-blue-500/10 border-blue-500/30 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]" : "bg-[#1E1F22] hover:bg-gray-800 text-gray-500 border-gray-800/50"}`}
+                        title={soundEnabled ? "Sound Enabled" : "Enable Sound"}
                     >
                         {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
                     </button>
