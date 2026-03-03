@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { LogOut, MonitorUp, AlertTriangle, CheckCircle2, Volume2, UserX, Users } from "lucide-react";
+import { LogOut, MonitorUp, AlertCircle, CheckCircle2, Volume2, UserMinus, Plus, Sparkles, Building2 } from "lucide-react";
 
 interface Company { id: string; name: string; interview_date: string }
 interface Registration { id: string; full_name: string; student_number: string; email: string; level: string }
@@ -12,10 +12,10 @@ interface Ticket {
     registration?: Registration;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-    pending: { label: "Waiting", color: "bg-gray-100 text-gray-700 border-gray-200" },
-    called: { label: "Called", color: "bg-blue-50 text-blue-700 border-blue-200" },
-    interviewing: { label: "Interviewing", color: "bg-green-50 text-green-700 border-green-200" },
+const STATUS_CONFIG: Record<string, { label: string; color: string; border: string }> = {
+    pending: { label: "Waiting", color: "bg-gray-800/50 text-gray-400", border: "border-gray-800" },
+    called: { label: "Called", color: "bg-blue-500/10 text-blue-400", border: "border-blue-500/20" },
+    interviewing: { label: "In Session", color: "bg-green-500/10 text-green-400", border: "border-green-500/20" },
 };
 
 export default function RoomLeadDashboard() {
@@ -170,8 +170,11 @@ export default function RoomLeadDashboard() {
     };
 
     if (loading) return (
-        <div className="min-h-screen bg-white flex items-center justify-center">
-            <div className="text-gray-400 font-medium">Loading workspace...</div>
+        <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+            <div className="text-gray-500 font-medium flex items-center gap-3">
+                <Sparkles className="w-5 h-5 animate-pulse text-blue-500" />
+                Loading workspace...
+            </div>
         </div>
     );
 
@@ -181,48 +184,47 @@ export default function RoomLeadDashboard() {
     const selectedComp = companies.find(c => c.id === selectedCompany);
 
     return (
-        <div className="min-h-screen bg-stone-50 text-stone-900 font-sans selection:bg-stone-200">
-            {/* Minimalist Topbar */}
-            <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-stone-200 px-4 md:px-8 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-md bg-stone-900 flex items-center justify-center shadow-sm">
-                        <Users className="w-4 h-4 text-white" />
+        <div className="min-h-screen bg-[#0A0A0B] text-gray-100 font-sans selection:bg-blue-500/30">
+            {/* Topbar (Google UI) */}
+            <header className="sticky top-0 z-20 bg-[#0A0A0B]/80 backdrop-blur-xl border-b border-gray-800/60 px-4 md:px-6 py-3.5 flex items-center justify-between transition-all">
+                <div className="flex items-center gap-3.5">
+                    <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                        <Building2 className="w-4 h-4 text-blue-400" />
                     </div>
                     <div>
-                        <h1 className="font-semibold text-sm leading-tight text-stone-900">Interviews</h1>
-                        {profile && <p className="text-stone-500 text-xs">{profile.full_name}</p>}
+                        <h1 className="font-medium text-sm leading-tight tracking-wide text-gray-100">Interviews</h1>
+                        {profile && <p className="text-gray-500 text-[11px] font-medium tracking-wide mt-0.5">{profile.full_name}</p>}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <a href="/display" target="_blank" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors hidden sm:flex">
+                <div className="flex items-center gap-1.5 md:gap-3">
+                    <a href="/display" target="_blank" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-[#1E1F22] rounded-full transition-colors hidden sm:flex">
                         <MonitorUp className="w-3.5 h-3.5" /> Display
                     </a>
-                    <div className="w-px h-4 bg-stone-200 mx-1 hidden sm:block"></div>
-                    <button onClick={handleSignOut} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors">
+                    <button onClick={handleSignOut} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-[#1E1F22] rounded-full transition-colors">
                         <LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sign Out</span>
                     </button>
                 </div>
             </header>
 
-            <main className="max-w-3xl mx-auto p-4 md:p-8 space-y-8 pb-20">
+            <main className="max-w-3xl mx-auto p-4 md:px-8 md:py-10 space-y-8 pb-24">
                 {/* Conflict Alert Base */}
                 {conflict && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 text-red-800 shadow-sm transition-all animate-in fade-in slide-in-from-top-2">
-                        <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-start gap-3.5 shadow-sm transition-all animate-in fade-in slide-in-from-top-2">
+                        <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                         <div className="flex-1">
-                            <h3 className="font-semibold text-sm">Conflict Detected</h3>
-                            <p className="text-sm opacity-90 mt-1">{conflict.msg}</p>
-                            <button onClick={() => setConflict(null)} className="text-xs font-medium text-red-600 hover:text-red-800 mt-2 underline underline-offset-2">Dismiss</button>
+                            <h3 className="font-medium text-sm text-red-200">System Conflict</h3>
+                            <p className="text-sm text-red-300/80 mt-1 leading-relaxed">{conflict.msg}</p>
+                            <button onClick={() => setConflict(null)} className="text-xs font-bold text-red-400 hover:text-red-300 mt-3 tracking-wide uppercase">Dismiss</button>
                         </div>
                     </div>
                 )}
 
                 {/* Company Selector (Admin) */}
                 {isAdmin ? (
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-stone-500 uppercase tracking-wider">Select Workspace</label>
+                    <div className="space-y-2 bg-[#131314] p-5 rounded-3xl border border-gray-800/60">
+                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest pl-1">Select Workspace</label>
                         <select value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}
-                            className="w-full h-10 px-3 bg-white border border-stone-200 rounded-md text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-stone-200 shadow-sm transition-all">
+                            className="w-full h-12 px-4 bg-[#1E1F22] border-none rounded-2xl text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none transition-all">
                             <option value="">Choose a company...</option>
                             {companies.map(c => (
                                 <option key={c.id} value={c.id}>{c.name} ({c.interview_date === "2026-03-03" ? "Mar 3" : "Mar 4"})</option>
@@ -230,32 +232,32 @@ export default function RoomLeadDashboard() {
                         </select>
                     </div>
                 ) : profile?.company_id && companies.length > 0 && (
-                    <div className="pb-4 border-b border-stone-200">
-                        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Company Board</p>
-                        <h2 className="text-2xl font-bold tracking-tight text-stone-900">{companies[0].name}</h2>
+                    <div className="px-2 pb-2">
+                        <p className="text-[11px] font-bold text-blue-400 uppercase tracking-widest mb-1">Assigned Workspace</p>
+                        <h2 className="text-3xl font-medium tracking-tight text-white">{companies[0].name}</h2>
                     </div>
                 )}
 
                 {!profile?.company_id && !isAdmin && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center text-yellow-800 shadow-sm">
-                        <h3 className="font-semibold mb-1">No Company Assigned</h3>
-                        <p className="text-sm opacity-80">Please request an administrator to assign you to a workspace.</p>
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-3xl p-8 text-center text-yellow-500">
+                        <h3 className="font-medium mb-1">No Workspace Assigned</h3>
+                        <p className="text-sm opacity-80">Please request an administrator to grant you access.</p>
                     </div>
                 )}
 
                 {selectedCompany && (
-                    <div className="space-y-8 animate-in fade-in duration-500">
+                    <div className="space-y-8 animate-in fade-in duration-700 delay-150">
 
-                        {/* Metrics Layout - Notion Style */}
-                        <div className="grid grid-cols-3 gap-4">
+                        {/* Metrics Layout */}
+                        <div className="grid grid-cols-3 gap-3">
                             {[
-                                { label: "Interviewing", value: activeTicket ? 1 : 0 },
+                                { label: "In Session", value: activeTicket ? 1 : 0 },
                                 { label: "At Door", value: calledTicket ? 1 : 0 },
                                 { label: "Waiting", value: queueTickets.length },
                             ].map(metric => (
-                                <div key={metric.label} className="bg-white border border-stone-200 rounded-lg p-4 shadow-sm flex flex-col items-center justify-center">
-                                    <span className="text-2xl font-semibold text-stone-900">{metric.value}</span>
-                                    <span className="text-xs font-medium text-stone-500 mt-1">{metric.label}</span>
+                                <div key={metric.label} className="bg-[#131314] border border-gray-800/60 rounded-[20px] p-5 flex flex-col items-center justify-center transition-colors hover:bg-[#1A1B1E]">
+                                    <span className="text-2xl md:text-3xl font-medium text-white">{metric.value}</span>
+                                    <span className="text-[10px] md:text-xs font-semibold uppercase tracking-widest text-gray-500 mt-2">{metric.label}</span>
                                 </div>
                             ))}
                         </div>
@@ -265,23 +267,23 @@ export default function RoomLeadDashboard() {
 
                             {/* Currently Interviewing Card */}
                             {activeTicket && (
-                                <div className="bg-white border text-stone-900 border-green-200 rounded-xl p-5 shadow-sm relative overflow-hidden group transition-all">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <span className="relative flex h-2 w-2">
+                                <div className="bg-[#1A1A1E] border border-green-500/20 rounded-[28px] p-6 shadow-lg shadow-green-500/5 relative overflow-hidden group transition-all">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-green-500"></div>
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="relative flex h-2.5 w-2.5">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                                         </span>
-                                        <span className="text-xs font-bold text-green-700 uppercase tracking-wider">In Progress</span>
+                                        <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest">In Session</span>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                                         <div>
-                                            <h3 className="text-xl font-bold">{activeTicket.registration?.full_name}</h3>
-                                            <p className="text-sm text-stone-500 font-medium mt-0.5">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
+                                            <h3 className="text-2xl font-medium text-white">{activeTicket.registration?.full_name}</h3>
+                                            <p className="text-sm text-gray-400 font-medium mt-1">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
                                         </div>
                                         <button onClick={() => { if (confirm("Mark interview as completed?")) updateStatus(activeTicket, "completed"); }}
-                                            className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-md text-sm font-medium transition-colors shadow-sm">
-                                            <CheckCircle2 className="w-4 h-4" /> Complete
+                                            className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 rounded-2xl text-sm font-medium transition-all">
+                                            <CheckCircle2 className="w-5 h-5" /> Complete
                                         </button>
                                     </div>
                                 </div>
@@ -289,30 +291,27 @@ export default function RoomLeadDashboard() {
 
                             {/* Called Ticket Card (Walking to room) */}
                             {calledTicket && (
-                                <div className="bg-white border border-blue-200 rounded-xl p-5 shadow-sm relative overflow-hidden transition-all">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Volume2 className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                                        <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Arriving</span>
+                                <div className="bg-[#13141A] border border-blue-500/30 rounded-[28px] p-6 shadow-[0_4px_24px_-4px_rgba(59,130,246,0.1)] relative overflow-hidden transition-all">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+                                    <div className="flex items-center gap-2.5 mb-4">
+                                        <Volume2 className="w-4 h-4 text-blue-400 animate-pulse" />
+                                        <span className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Arriving Next</span>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                                         <div>
-                                            <h3 className="text-lg font-bold text-stone-900">{calledTicket.registration?.full_name}</h3>
-                                            <p className="text-sm text-stone-500 font-medium mt-0.5">{calledTicket.registration?.student_number}</p>
+                                            <h3 className="text-xl font-medium text-white">{calledTicket.registration?.full_name}</h3>
+                                            <p className="text-sm text-gray-400 font-medium mt-1">{calledTicket.registration?.student_number}</p>
                                         </div>
-                                        <div className="flex gap-2 w-full sm:w-auto">
+                                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                                             <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
-                                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-md text-sm font-medium transition-colors">
-                                                Start
+                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-20 disabled:grayscale text-white rounded-2xl text-sm font-medium transition-all">
+                                                Begin <span className="hidden sm:inline">Session</span>
                                             </button>
                                             <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
-                                                className="flex items-center justify-center gap-1.5 px-3 py-2 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-md text-sm font-medium transition-colors">
-                                                <UserX className="w-4 h-4" />
+                                                className="flex items-center justify-center gap-2 px-4 py-3.5 text-gray-400 hover:text-gray-200 hover:bg-[#1E1F22] border border-transparent hover:border-gray-800 rounded-2xl text-sm font-medium transition-all">
+                                                <UserMinus className="w-4 h-4" />
                                             </button>
                                         </div>
-                                        {activeTicket && (
-                                            <p className="text-[10px] text-stone-400 absolute bottom-2 right-4 hidden sm:block">Finish current interview to start</p>
-                                        )}
                                     </div>
                                 </div>
                             )}
@@ -320,39 +319,39 @@ export default function RoomLeadDashboard() {
                         </div>
 
                         {/* Roster / Queue List */}
-                        <div className="mt-8">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-bold text-stone-900 border-b-2 border-stone-900 pb-1 inline-block">Up Next</h3>
-                                <div className="px-2 py-0.5 bg-stone-100 border border-stone-200 text-stone-600 text-xs font-semibold rounded-full">{queueTickets.length}</div>
+                        <div className="mt-10">
+                            <div className="flex items-center justify-between mb-5 px-1">
+                                <h3 className="text-[13px] font-bold text-gray-300 tracking-wide">Queue List</h3>
+                                <div className="px-3 py-1 bg-[#1A1A1E] text-gray-400 text-[11px] font-bold tracking-widest uppercase rounded-full">{queueTickets.length} Total</div>
                             </div>
 
-                            <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
+                            <div className="bg-[#131314] border border-gray-800/60 rounded-[28px] overflow-hidden">
                                 {queueTickets.length === 0 ? (
-                                    <div className="p-8 text-center bg-stone-50">
-                                        <p className="text-sm text-stone-500 font-medium">No candidates in queue.</p>
+                                    <div className="p-10 text-center">
+                                        <p className="text-sm text-gray-500 font-medium">No candidates in queue.</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-stone-100">
+                                    <div className="divide-y divide-gray-800/50">
                                         {queueTickets.map((ticket, i) => (
-                                            <div key={ticket.id} className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-stone-50/80 transition-colors">
-                                                <div className="flex items-center gap-3 w-full sm:w-auto">
-                                                    <span className="w-6 text-center text-xs font-bold text-stone-400 select-none">{i + 1}</span>
+                                            <div key={ticket.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-[#1A1B1E] transition-colors">
+                                                <div className="flex items-center gap-4 w-full sm:w-auto">
+                                                    <span className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center text-[11px] font-bold text-gray-500 select-none border border-gray-700/50">{i + 1}</span>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-semibold text-stone-900 truncate">{ticket.registration?.full_name}</p>
-                                                        <p className="text-xs text-stone-500 truncate">{ticket.registration?.student_number} · {ticket.registration?.level}</p>
+                                                        <p className="text-base font-medium text-gray-200 truncate">{ticket.registration?.full_name}</p>
+                                                        <p className="text-[13px] text-gray-500 mt-0.5 truncate">{ticket.registration?.student_number} <span className="mx-1.5 opacity-40">|</span> {ticket.registration?.level}</p>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex gap-2 w-full sm:w-auto pl-9 sm:pl-0">
+                                                <div className="flex gap-2.5 w-full sm:w-auto pl-12 sm:pl-0">
                                                     {/* Strict Logic Requirement: Only show "Call" if no one is currently called */}
                                                     {!calledTicket && (
                                                         <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
-                                                            className="flex-1 sm:flex-none px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-md text-xs font-medium transition-all shadow-sm">
-                                                            Call
+                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
+                                                            Call Next
                                                         </button>
                                                     )}
                                                     <button onClick={() => { if (confirm(`Skip ${ticket.registration?.full_name}?`)) updateStatus(ticket, "skipped"); }}
-                                                        className="px-3 py-1.5 text-stone-500 hover:text-stone-800 hover:bg-stone-200 rounded-md text-xs font-medium transition-all">
+                                                        className="px-4 py-2.5 text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:border-gray-700/50">
                                                         Skip
                                                     </button>
                                                 </div>
@@ -365,20 +364,20 @@ export default function RoomLeadDashboard() {
 
                         {/* Skipped Recovery Zone */}
                         {skippedTickets.length > 0 && (
-                            <div className="mt-8 opacity-70 hover:opacity-100 transition-opacity">
-                                <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">Skipped / No-Shows</h3>
-                                <div className="bg-stone-100 border border-stone-200 rounded-lg overflow-hidden">
-                                    <div className="divide-y divide-stone-200/50">
+                            <div className="mt-12 opacity-60 hover:opacity-100 transition-opacity duration-300">
+                                <h3 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-4 px-1">Skipped Profiles</h3>
+                                <div className="bg-[#131314]/50 border border-gray-800/40 rounded-[24px] overflow-hidden">
+                                    <div className="divide-y divide-gray-800/30">
                                         {skippedTickets.map(ticket => (
-                                            <div key={ticket.id} className="p-3 flex items-center justify-between gap-3 text-sm">
-                                                <div className="min-w-0">
-                                                    <p className="font-medium text-stone-600 truncate">{ticket.registration?.full_name}</p>
+                                            <div key={ticket.id} className="p-4 flex items-center justify-between gap-4 text-sm">
+                                                <div className="min-w-0 pl-2">
+                                                    <p className="font-medium text-gray-400 truncate">{ticket.registration?.full_name}</p>
                                                 </div>
                                                 <button
                                                     onClick={() => { if (confirm(`Recall ${ticket.registration?.full_name} back to the queue?`)) recallTicket(ticket); }}
-                                                    className="px-2 py-1 text-xs font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-200 rounded transition-colors shrink-0"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-300 hover:bg-gray-800 rounded-lg transition-colors shrink-0"
                                                 >
-                                                    Recall
+                                                    <Plus className="w-3.5 h-3.5" /> Re-add
                                                 </button>
                                             </div>
                                         ))}
