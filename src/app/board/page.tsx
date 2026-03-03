@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { ClipboardList, LogOut, Search, Clock, PlayCircle, CheckCircle2 } from "lucide-react";
 
 interface Ticket {
     id: string;
@@ -14,10 +15,10 @@ interface Ticket {
     company?: { name: string };
 }
 
-const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
-    pending: { label: "Waiting", cls: "bg-amber-500/20 text-amber-300 border-amber-500/40" },
-    called: { label: "Called", cls: "bg-blue-500/20 text-blue-300 border-blue-500/40" },
-    interviewing: { label: "In Interview", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
+const STATUS_STYLE: Record<string, { label: string; cls: string; icon: any }> = {
+    pending: { label: "Waiting", cls: "bg-stone-100 text-stone-600 border-stone-200", icon: Clock },
+    called: { label: "Called", cls: "bg-blue-50 text-blue-700 border-blue-200", icon: PlayCircle },
+    interviewing: { label: "In Session", cls: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle2 },
 };
 
 export default function WaitingRoomBoard() {
@@ -37,7 +38,7 @@ export default function WaitingRoomBoard() {
             if (!user) { router.push("/login"); return; }
             setAuthed(true);
         });
-    }, []);
+    }, [router, supabase]);
 
     const fetchTickets = async () => {
         const { data } = await supabase
@@ -55,7 +56,6 @@ export default function WaitingRoomBoard() {
         fetchTickets();
         const timer = setInterval(() => setTime(new Date()), 1000);
 
-        // Real-time subscription — use unique channel name to avoid stale subscriptions
         const channelName = `board-${Date.now()}`;
         const channel = supabase
             .channel(channelName)
@@ -64,16 +64,14 @@ export default function WaitingRoomBoard() {
                 schema: "public",
                 table: "queue_tickets",
             }, () => { fetchTickets(); })
-            .subscribe((status) => {
-                console.log("Board realtime:", status);
-            });
+            .subscribe();
 
         channelRef.current = channel;
         return () => {
             clearInterval(timer);
             channel.unsubscribe();
         };
-    }, [authed]);
+    }, [authed, supabase]);
 
     const filtered = tickets.filter(t => {
         const matchStatus = filter === "all" || t.status === filter;
@@ -88,95 +86,127 @@ export default function WaitingRoomBoard() {
     };
 
     if (!authed) return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-            <div className="text-slate-400 animate-pulse">Authenticating...</div>
+        <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+            <div className="text-stone-400 font-medium">Authenticating...</div>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+        <div className="min-h-screen bg-stone-50 flex flex-col font-sans text-stone-900 selection:bg-stone-200">
             {/* Header */}
-            <header className="bg-slate-900 border-b border-slate-700/50 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
-                    <span className="text-white font-black text-base">Waiting Room Monitor</span>
-                    <span className="hidden sm:inline text-slate-500 text-sm">· Career Fair 2026</span>
+            <header className="bg-white border-b border-stone-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-stone-900 flex items-center justify-center">
+                        <ClipboardList className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="font-bold text-lg leading-tight tracking-tight">Master Directory</h1>
+                        <p className="text-stone-500 text-xs font-medium uppercase tracking-wider hidden sm:block">Internal Queue Monitor</p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <span className="text-slate-400 font-mono text-sm tabular-nums">
+                <div className="flex items-center gap-6">
+                    <span className="text-stone-600 font-mono text-sm font-semibold tabular-nums hidden sm:block">
                         {time.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                     </span>
                     <button onClick={() => { supabase.auth.signOut(); router.push("/login"); }}
-                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Sign Out</button>
+                        className="flex items-center gap-2 text-sm font-medium text-stone-500 hover:text-stone-900 transition-colors">
+                        <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Sign Out</span>
+                    </button>
                 </div>
             </header>
 
-            {/* Stats bar */}
-            <div className="bg-slate-900/50 border-b border-slate-800 px-4 py-2 flex items-center gap-3 overflow-x-auto">
-                {(["all", "pending", "called", "interviewing"] as const).map(s => (
-                    <button
-                        key={s}
-                        onClick={() => setFilter(s)}
-                        className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === s ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
-                    >
-                        {s === "all" ? `All (${tickets.length})` : s === "pending" ? `⏳ Waiting (${counts.pending})` : s === "called" ? `📣 Called (${counts.called})` : `🟢 In Interview (${counts.interviewing})`}
-                    </button>
-                ))}
-                <div className="ml-auto flex-shrink-0">
+            {/* Toolbar */}
+            <div className="bg-white border-b border-stone-200 px-6 py-3 flex flex-col sm:flex-row items-center gap-4 shadow-sm z-0">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    {(["all", "pending", "called", "interviewing"] as const).map(s => (
+                        <button
+                            key={s}
+                            onClick={() => setFilter(s)}
+                            className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-md text-xs font-semibold transition-all border ${filter === s ? "bg-stone-900 text-white border-stone-900 shadow-sm" : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50 hover:text-stone-900"}`}
+                        >
+                            {s === "all" ? `All (${tickets.length})`
+                                : s === "pending" ? <><Clock className="w-3.5 h-3.5" /> Waiting ({counts.pending})</>
+                                    : s === "called" ? <><PlayCircle className="w-3.5 h-3.5" /> Called ({counts.called})</>
+                                        : <><CheckCircle2 className="w-3.5 h-3.5" /> Session ({counts.interviewing})</>}
+                        </button>
+                    ))}
+                </div>
+                <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 bg-stone-100 border border-stone-200 rounded-md px-3 py-2 text-stone-500 focus-within:bg-white focus-within:border-stone-400 focus-within:ring-2 focus-within:ring-stone-100 transition-all">
+                    <Search className="w-4 h-4" />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search name / ID..."
-                        className="w-40 sm:w-52 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Search name or ID..."
+                        className="w-full sm:w-48 bg-transparent text-sm text-stone-900 placeholder-stone-400 focus:outline-none"
                     />
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="flex-1 overflow-auto">
-                {loading ? (
-                    <div className="text-slate-600 text-center py-20 animate-pulse">Loading queue data...</div>
-                ) : filtered.length === 0 ? (
-                    <div className="text-slate-600 text-center py-20 text-sm">No entries match your filter.</div>
-                ) : (
-                    <table className="w-full text-sm min-w-[480px]">
-                        <thead className="sticky top-0 bg-slate-900 border-b border-slate-800">
-                            <tr>
-                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide w-8">#</th>
-                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide">Candidate</th>
-                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide hidden sm:table-cell">Level</th>
-                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide">Company</th>
-                                <th className="text-left px-4 py-3 text-slate-400 font-semibold text-xs uppercase tracking-wide">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map((ticket, i) => (
-                                <tr key={ticket.id} className={`border-b border-slate-800/60 transition-colors ${ticket.status === "interviewing" ? "bg-emerald-500/5" : ticket.status === "called" ? "bg-blue-500/5" : "hover:bg-slate-800/40"}`}>
-                                    <td className="px-4 py-3 text-slate-500 text-xs tabular-nums">{i + 1}</td>
-                                    <td className="px-4 py-3">
-                                        <p className="text-white font-semibold leading-tight">{ticket.registration?.full_name}</p>
-                                        <p className="text-slate-500 text-xs mt-0.5">{ticket.registration?.student_number}</p>
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-400 text-xs hidden sm:table-cell">{ticket.registration?.level}</td>
-                                    <td className="px-4 py-3">
-                                        <span className="text-slate-300 font-medium text-xs">{ticket.company?.name}</span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold border ${STATUS_STYLE[ticket.status]?.cls}`}>
-                                            {ticket.status === "called" && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />}
-                                            {ticket.status === "interviewing" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-                                            {STATUS_STYLE[ticket.status]?.label}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+            {/* Table Area */}
+            <div className="flex-1 overflow-auto p-6">
+                <div className="max-w-7xl mx-auto bg-white border border-stone-200 rounded-xl shadow-sm overflow-hidden">
+                    {loading ? (
+                        <div className="p-12 text-center text-stone-400 animate-pulse font-medium">Loading queue records...</div>
+                    ) : filtered.length === 0 ? (
+                        <div className="p-12 pb-16 text-center text-stone-500 flex flex-col items-center">
+                            <Search className="w-8 h-8 text-stone-300 mb-3" />
+                            <p className="font-medium">No candidates match your current filter.</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-stone-50 border-b border-stone-200 text-stone-500 text-xs uppercase tracking-wider font-semibold">
+                                    <tr>
+                                        <th className="px-6 py-4 w-12 text-center">#</th>
+                                        <th className="px-6 py-4">Candidate</th>
+                                        <th className="px-6 py-4 hidden sm:table-cell">Details</th>
+                                        <th className="px-6 py-4">Destination</th>
+                                        <th className="px-6 py-4">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-stone-100">
+                                    {filtered.map((ticket, i) => {
+                                        const StatusIcon = STATUS_STYLE[ticket.status]?.icon || Clock;
+                                        return (
+                                            <tr key={ticket.id} className="hover:bg-stone-50/80 transition-colors">
+                                                <td className="px-6 py-4 text-center text-stone-400 font-medium tabular-nums">{i + 1}</td>
+                                                <td className="px-6 py-4">
+                                                    <p className="font-bold text-stone-900">{ticket.registration?.full_name}</p>
+                                                    <p className="text-stone-500 text-xs mt-0.5 sm:hidden">{ticket.registration?.student_number}</p>
+                                                </td>
+                                                <td className="px-6 py-4 hidden sm:table-cell">
+                                                    <p className="text-stone-700 font-medium">{ticket.registration?.student_number}</p>
+                                                    <p className="text-stone-400 text-xs mt-0.5">{ticket.registration?.level}</p>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
+                                                        {ticket.company?.name || "Unknown"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${STATUS_STYLE[ticket.status]?.cls}`}>
+                                                        <StatusIcon className="w-3.5 h-3.5" />
+                                                        {STATUS_STYLE[ticket.status]?.label}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <footer className="bg-slate-900/50 border-t border-slate-800 px-4 py-2 text-center text-slate-600 text-xs">
-                {tickets.length} active · Live updating · {new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+            <footer className="bg-stone-900 px-6 py-3 text-center text-stone-400 text-xs font-medium border-t border-stone-800 shrink-0">
+                <span className="flex items-center justify-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    {tickets.length} total active records · Real-time synchronization
+                </span>
             </footer>
         </div>
     );

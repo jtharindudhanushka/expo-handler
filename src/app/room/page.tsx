@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { LogOut, MonitorUp, AlertTriangle, CheckCircle2, Volume2, UserX, Users } from "lucide-react";
 
 interface Company { id: string; name: string; interview_date: string }
 interface Registration { id: string; full_name: string; student_number: string; email: string; level: string }
@@ -12,9 +13,9 @@ interface Ticket {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-    pending: { label: "WAITING", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-    called: { label: "CALLED", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
-    interviewing: { label: "INTERVIEWING", color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
+    pending: { label: "Waiting", color: "bg-gray-100 text-gray-700 border-gray-200" },
+    called: { label: "Called", color: "bg-blue-50 text-blue-700 border-blue-200" },
+    interviewing: { label: "Interviewing", color: "bg-green-50 text-green-700 border-green-200" },
 };
 
 export default function RoomLeadDashboard() {
@@ -53,7 +54,7 @@ export default function RoomLeadDashboard() {
             setLoading(false);
         };
         init();
-    }, []);
+    }, [router, supabase]);
 
     const fetchTickets = useCallback(async () => {
         if (!selectedCompany) { setTickets([]); return; }
@@ -65,7 +66,6 @@ export default function RoomLeadDashboard() {
             .order("position", { ascending: true });
         setTickets((data || []) as unknown as Ticket[]);
 
-        // Also fetch skipped/no-show tickets for the recall section
         const { data: skipped } = await supabase
             .from("queue_tickets")
             .select("id, status, position, created_at, registration_id, registration:registrations(id, full_name, student_number, email, level)")
@@ -73,11 +73,10 @@ export default function RoomLeadDashboard() {
             .in("status", ["skipped"])
             .order("position", { ascending: true });
         setSkippedTickets((skipped || []) as unknown as Ticket[]);
-    }, [selectedCompany]);
+    }, [selectedCompany, supabase]);
 
     useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
-    // Real-time subscription — recreate when company changes
     useEffect(() => {
         if (!selectedCompany) return;
         if (channelRef.current) channelRef.current.unsubscribe();
@@ -92,12 +91,8 @@ export default function RoomLeadDashboard() {
 
         channelRef.current = channel;
         return () => { channel.unsubscribe(); };
-    }, [selectedCompany, fetchTickets]);
+    }, [selectedCompany, fetchTickets, supabase]);
 
-    /**
-     * Check if a registration is currently being called or interviewed at another company.
-     * Returns the conflicting company name, or null if clear.
-     */
     const checkConflict = async (registrationId: string, currentTicketId: string): Promise<string | null> => {
         const { data } = await supabase
             .from("queue_tickets")
@@ -132,13 +127,12 @@ export default function RoomLeadDashboard() {
     const updateStatus = async (ticket: Ticket, newStatus: string) => {
         setConflict(null);
 
-        // Conflict check: if calling or starting interview, ensure candidate isn't elsewhere
         if (newStatus === "called" || newStatus === "interviewing") {
             const conflictAt = await checkConflict(ticket.registration_id, ticket.id);
             if (conflictAt) {
                 setConflict({
                     ticketId: ticket.id,
-                    msg: `${ticket.registration?.full_name} is already ${newStatus === "called" ? "active" : "being interviewed"} at ${conflictAt}. Cannot call them here simultaneously.`,
+                    msg: `${ticket.registration?.full_name} is already active at ${conflictAt}. Cannot call them simultaneously.`,
                 });
                 return;
             }
@@ -153,11 +147,10 @@ export default function RoomLeadDashboard() {
 
             const data = await res.json();
             if (!res.ok) {
-                // 23505 is PostgreSQL uniqueviolation
                 if (data.code === "23505" || (data.error && data.error.includes("duplicate key value"))) {
                     setConflict({
                         ticketId: ticket.id,
-                        msg: `${ticket.registration?.full_name} was just called or moved to interview by another room. Please refresh.`,
+                        msg: `${ticket.registration?.full_name} was just called by another room. Please refresh.`,
                     });
                 } else {
                     alert(`Error updating status: ${data.error}`);
@@ -177,8 +170,8 @@ export default function RoomLeadDashboard() {
     };
 
     if (loading) return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-            <div className="text-slate-400 animate-pulse">Loading...</div>
+        <div className="min-h-screen bg-white flex items-center justify-center">
+            <div className="text-gray-400 font-medium">Loading workspace...</div>
         </div>
     );
 
@@ -188,206 +181,215 @@ export default function RoomLeadDashboard() {
     const selectedComp = companies.find(c => c.id === selectedCompany);
 
     return (
-        <div className="min-h-screen bg-slate-950 font-sans">
-            {/* Header */}
-            <header className="bg-slate-900 border-b border-slate-700/50 px-4 md:px-8 py-4 flex items-center justify-between">
+        <div className="min-h-screen bg-stone-50 text-stone-900 font-sans selection:bg-stone-200">
+            {/* Minimalist Topbar */}
+            <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-stone-200 px-4 md:px-8 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+                    <div className="w-8 h-8 rounded-md bg-stone-900 flex items-center justify-center shadow-sm">
+                        <Users className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                        <p className="text-white font-bold text-sm">Room Lead Dashboard</p>
-                        {profile && <p className="text-slate-400 text-xs">{profile.full_name}</p>}
+                        <h1 className="font-semibold text-sm leading-tight text-stone-900">Interviews</h1>
+                        {profile && <p className="text-stone-500 text-xs">{profile.full_name}</p>}
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <a href="/display" target="_blank" className="text-xs text-slate-500 hover:text-slate-300 hidden sm:block transition-colors">Display Board ↗</a>
-                    <button onClick={handleSignOut} className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-all">Sign Out</button>
+                <div className="flex items-center gap-2">
+                    <a href="/display" target="_blank" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors hidden sm:flex">
+                        <MonitorUp className="w-3.5 h-3.5" /> Display
+                    </a>
+                    <div className="w-px h-4 bg-stone-200 mx-1 hidden sm:block"></div>
+                    <button onClick={handleSignOut} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-md transition-colors">
+                        <LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sign Out</span>
+                    </button>
                 </div>
             </header>
 
-            <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
-                {/* Conflict warning */}
+            <main className="max-w-3xl mx-auto p-4 md:p-8 space-y-8 pb-20">
+                {/* Conflict Alert Base */}
                 {conflict && (
-                    <div className="bg-red-500/10 border border-red-500/40 rounded-2xl p-4 flex items-start gap-3">
-                        <span className="text-red-400 text-xl mt-0.5">⚠</span>
-                        <div>
-                            <p className="text-red-300 font-bold text-sm">Conflict Detected</p>
-                            <p className="text-slate-400 text-sm mt-0.5">{conflict.msg}</p>
-                            <button onClick={() => setConflict(null)} className="text-xs text-slate-500 hover:text-slate-300 mt-2 transition-colors">Dismiss</button>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 text-red-800 shadow-sm transition-all animate-in fade-in slide-in-from-top-2">
+                        <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-sm">Conflict Detected</h3>
+                            <p className="text-sm opacity-90 mt-1">{conflict.msg}</p>
+                            <button onClick={() => setConflict(null)} className="text-xs font-medium text-red-600 hover:text-red-800 mt-2 underline underline-offset-2">Dismiss</button>
                         </div>
                     </div>
                 )}
 
-                {/* Company display */}
+                {/* Company Selector (Admin) */}
                 {isAdmin ? (
-                    <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-5">
-                        <label className="block text-sm font-semibold text-slate-300 mb-3">Select Company (Admin View)</label>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-stone-500 uppercase tracking-wider">Select Workspace</label>
                         <select value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}
-                            className="w-full h-12 px-4 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
-                            <option value="">-- Select Company --</option>
+                            className="w-full h-10 px-3 bg-white border border-stone-200 rounded-md text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-stone-200 shadow-sm transition-all">
+                            <option value="">Choose a company...</option>
                             {companies.map(c => (
                                 <option key={c.id} value={c.id}>{c.name} ({c.interview_date === "2026-03-03" ? "Mar 3" : "Mar 4"})</option>
                             ))}
                         </select>
                     </div>
-                ) : profile?.company_id ? (
-                    companies.length > 0 && (
-                        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-5 flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-indigo-400 font-semibold uppercase tracking-wide mb-1">Your Assigned Company</p>
-                                <p className="text-white text-xl font-black">{companies[0].name}</p>
-                                <p className="text-slate-400 text-sm">{companies[0].interview_date === "2026-03-03" ? "March 3" : "March 4"}</p>
-                            </div>
-                            <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                                <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                            </div>
-                        </div>
-                    )
-                ) : (
-                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-center">
-                        <p className="text-amber-400 font-bold text-lg mb-1">⚠ No Company Assigned</p>
-                        <p className="text-slate-400 text-sm">Please ask an admin to assign you to a company in User Management.</p>
+                ) : profile?.company_id && companies.length > 0 && (
+                    <div className="pb-4 border-b border-stone-200">
+                        <p className="text-xs font-medium text-stone-500 uppercase tracking-wider mb-1">Company Board</p>
+                        <h2 className="text-2xl font-bold tracking-tight text-stone-900">{companies[0].name}</h2>
+                    </div>
+                )}
+
+                {!profile?.company_id && !isAdmin && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center text-yellow-800 shadow-sm">
+                        <h3 className="font-semibold mb-1">No Company Assigned</h3>
+                        <p className="text-sm opacity-80">Please request an administrator to assign you to a workspace.</p>
                     </div>
                 )}
 
                 {selectedCompany && (
-                    <>
-                        {/* Status summary */}
-                        <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-8 animate-in fade-in duration-500">
+
+                        {/* Metrics Layout - Notion Style */}
+                        <div className="grid grid-cols-3 gap-4">
                             {[
-                                { label: "In Interview", value: activeTicket ? 1 : 0, color: "text-emerald-400" },
-                                { label: "Called / Ready", value: calledTicket ? 1 : 0, color: "text-blue-400" },
-                                { label: "Waiting", value: queueTickets.length, color: "text-amber-400" },
-                            ].map(s => (
-                                <div key={s.label} className="bg-slate-900 border border-slate-700/50 rounded-xl p-4 text-center">
-                                    <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
-                                    <div className="text-slate-400 text-xs mt-0.5">{s.label}</div>
+                                { label: "Interviewing", value: activeTicket ? 1 : 0 },
+                                { label: "At Door", value: calledTicket ? 1 : 0 },
+                                { label: "Waiting", value: queueTickets.length },
+                            ].map(metric => (
+                                <div key={metric.label} className="bg-white border border-stone-200 rounded-lg p-4 shadow-sm flex flex-col items-center justify-center">
+                                    <span className="text-2xl font-semibold text-stone-900">{metric.value}</span>
+                                    <span className="text-xs font-medium text-stone-500 mt-1">{metric.label}</span>
                                 </div>
                             ))}
                         </div>
 
-                        {/* Currently interviewing */}
-                        {activeTicket && (
-                            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                    <span className="text-emerald-400 font-bold text-sm uppercase tracking-wide">Currently Interviewing</span>
-                                </div>
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <h2 className="text-white text-2xl font-black">{activeTicket.registration?.full_name}</h2>
-                                        <p className="text-slate-400 text-sm mt-1">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
-                                    </div>
-                                    <button onClick={() => { if (confirm("Mark interview as completed?")) updateStatus(activeTicket, "completed"); }}
-                                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20 transition-all whitespace-nowrap">
-                                        ✓ Mark Complete
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        {/* Active Operations Area */}
+                        <div className="space-y-4">
 
-                        {/* Called / ready to enter */}
-                        {calledTicket && (
-                            <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-5">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                                    <span className="text-blue-400 font-bold text-sm uppercase tracking-wide">Called — Proceeding to Room</span>
-                                </div>
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <p className="text-white font-bold">{calledTicket.registration?.full_name}</p>
-                                        <p className="text-slate-400 text-xs">{calledTicket.registration?.student_number}</p>
+                            {/* Currently Interviewing Card */}
+                            {activeTicket && (
+                                <div className="bg-white border text-stone-900 border-green-200 rounded-xl p-5 shadow-sm relative overflow-hidden group transition-all">
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                        </span>
+                                        <span className="text-xs font-bold text-green-700 uppercase tracking-wider">In Progress</span>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
-                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all">
-                                            Start Interview
-                                        </button>
-                                        <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
-                                            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-sm transition-all">
-                                            No Show
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-xl font-bold">{activeTicket.registration?.full_name}</h3>
+                                            <p className="text-sm text-stone-500 font-medium mt-0.5">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
+                                        </div>
+                                        <button onClick={() => { if (confirm("Mark interview as completed?")) updateStatus(activeTicket, "completed"); }}
+                                            className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-md text-sm font-medium transition-colors shadow-sm">
+                                            <CheckCircle2 className="w-4 h-4" /> Complete
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Queue list */}
-                        <div className="bg-slate-900 border border-slate-700/50 rounded-2xl overflow-hidden">
-                            <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
-                                <h3 className="text-white font-bold">
-                                    Queue — {selectedComp?.name}
-                                </h3>
-                                <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full">{queueTickets.length} waiting</span>
-                            </div>
-                            <div className="divide-y divide-slate-700/30">
-                                {queueTickets.length === 0 ? (
-                                    <div className="text-center py-12 text-slate-500 text-sm">Queue is empty.</div>
-                                ) : queueTickets.map((ticket, i) => (
-                                    <div key={ticket.id} className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 ${i === 0 ? "bg-white/5" : ""}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-sm flex-shrink-0">
-                                                {i + 1}
-                                            </div>
-                                            <div>
-                                                <p className="text-white font-semibold">{ticket.registration?.full_name}</p>
-                                                <p className="text-slate-400 text-xs">{ticket.registration?.student_number} · {ticket.registration?.level}</p>
-                                            </div>
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${STATUS_CONFIG[ticket.status]?.color}`}>
-                                                {STATUS_CONFIG[ticket.status]?.label}
-                                            </span>
+                            {/* Called Ticket Card (Walking to room) */}
+                            {calledTicket && (
+                                <div className="bg-white border border-blue-200 rounded-xl p-5 shadow-sm relative overflow-hidden transition-all">
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Volume2 className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                                        <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Arriving</span>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-stone-900">{calledTicket.registration?.full_name}</h3>
+                                            <p className="text-sm text-stone-500 font-medium mt-0.5">{calledTicket.registration?.student_number}</p>
                                         </div>
                                         <div className="flex gap-2 w-full sm:w-auto">
-                                            {/* Allow calling next even if someone else is being interviewed or called — reduces wait */}
-                                            {ticket.status === "pending" && (
-                                                <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
-                                                    className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-sm transition-all">
-                                                    Call to Room
-                                                </button>
-                                            )}
-                                            <button onClick={() => { if (confirm(`Skip ${ticket.registration?.full_name} and put them in No-Show list?`)) updateStatus(ticket, "skipped"); }}
-                                                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-semibold text-sm transition-all">
-                                                Skip
+                                            <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
+                                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-md text-sm font-medium transition-colors">
+                                                Start
+                                            </button>
+                                            <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
+                                                className="flex items-center justify-center gap-1.5 px-3 py-2 text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-md text-sm font-medium transition-colors">
+                                                <UserX className="w-4 h-4" />
                                             </button>
                                         </div>
+                                        {activeTicket && (
+                                            <p className="text-[10px] text-stone-400 absolute bottom-2 right-4 hidden sm:block">Finish current interview to start</p>
+                                        )}
                                     </div>
-                                ))}
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Roster / Queue List */}
+                        <div className="mt-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-bold text-stone-900 border-b-2 border-stone-900 pb-1 inline-block">Up Next</h3>
+                                <div className="px-2 py-0.5 bg-stone-100 border border-stone-200 text-stone-600 text-xs font-semibold rounded-full">{queueTickets.length}</div>
+                            </div>
+
+                            <div className="bg-white border border-stone-200 rounded-lg shadow-sm overflow-hidden">
+                                {queueTickets.length === 0 ? (
+                                    <div className="p-8 text-center bg-stone-50">
+                                        <p className="text-sm text-stone-500 font-medium">No candidates in queue.</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-stone-100">
+                                        {queueTickets.map((ticket, i) => (
+                                            <div key={ticket.id} className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-stone-50/80 transition-colors">
+                                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                                    <span className="w-6 text-center text-xs font-bold text-stone-400 select-none">{i + 1}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-stone-900 truncate">{ticket.registration?.full_name}</p>
+                                                        <p className="text-xs text-stone-500 truncate">{ticket.registration?.student_number} · {ticket.registration?.level}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex gap-2 w-full sm:w-auto pl-9 sm:pl-0">
+                                                    {/* Strict Logic Requirement: Only show "Call" if no one is currently called */}
+                                                    {!calledTicket && (
+                                                        <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
+                                                            className="flex-1 sm:flex-none px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-md text-xs font-medium transition-all shadow-sm">
+                                                            Call
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => { if (confirm(`Skip ${ticket.registration?.full_name}?`)) updateStatus(ticket, "skipped"); }}
+                                                        className="px-3 py-1.5 text-stone-500 hover:text-stone-800 hover:bg-stone-200 rounded-md text-xs font-medium transition-all">
+                                                        Skip
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Skipped / No-Show — Recall section */}
+                        {/* Skipped Recovery Zone */}
                         {skippedTickets.length > 0 && (
-                            <div className="bg-slate-900 border border-slate-700/50 rounded-2xl overflow-hidden opacity-80">
-                                <div className="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
-                                    <h3 className="text-slate-400 font-bold text-sm">Skipped / No Show</h3>
-                                    <span className="px-2 py-0.5 bg-slate-700 text-slate-400 text-xs font-bold rounded-full">{skippedTickets.length}</span>
-                                </div>
-                                <div className="divide-y divide-slate-700/30">
-                                    {skippedTickets.map(ticket => (
-                                        <div key={ticket.id} className="flex items-center justify-between p-4 gap-4">
-                                            <div>
-                                                <p className="text-slate-300 font-semibold text-sm">{ticket.registration?.full_name}</p>
-                                                <p className="text-slate-500 text-xs">{ticket.registration?.student_number} · {ticket.registration?.level}</p>
+                            <div className="mt-8 opacity-70 hover:opacity-100 transition-opacity">
+                                <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">Skipped / No-Shows</h3>
+                                <div className="bg-stone-100 border border-stone-200 rounded-lg overflow-hidden">
+                                    <div className="divide-y divide-stone-200/50">
+                                        {skippedTickets.map(ticket => (
+                                            <div key={ticket.id} className="p-3 flex items-center justify-between gap-3 text-sm">
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-stone-600 truncate">{ticket.registration?.full_name}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => { if (confirm(`Recall ${ticket.registration?.full_name} back to the queue?`)) recallTicket(ticket); }}
+                                                    className="px-2 py-1 text-xs font-medium text-stone-500 hover:text-stone-900 hover:bg-stone-200 rounded transition-colors shrink-0"
+                                                >
+                                                    Recall
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => { if (confirm(`Recall ${ticket.registration?.full_name} back to the end of the waiting queue?`)) recallTicket(ticket); }}
-                                                className="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 rounded-xl font-semibold text-xs transition-all whitespace-nowrap"
-                                            >
-                                                ↩ Recall
-                                            </button>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
-                    </>
+
+                    </div>
                 )}
-            </div>
+            </main>
         </div>
     );
 }
