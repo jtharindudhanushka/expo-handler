@@ -300,8 +300,8 @@ export default function RoomLeadDashboard() {
                                             Begin <span className="hidden sm:inline">Session</span>
                                         </button>
                                         <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
-                                            className="flex items-center justify-center gap-2 px-5 py-3.5 sm:py-3 text-gray-400 hover:text-gray-200 hover:bg-[#1E1F22] border border-transparent hover:border-gray-800 rounded-xl transition-all">
-                                            <UserMinus className="w-4 h-4" />
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 sm:py-3 text-gray-300 hover:text-white bg-[#1E1F22] hover:bg-[#25262B] border border-gray-800 rounded-xl text-sm font-medium transition-all shadow-sm">
+                                            <UserMinus className="w-4 h-4" /> Skip Candidate
                                         </button>
                                     </div>
                                 </div>
@@ -337,12 +337,12 @@ export default function RoomLeadDashboard() {
                                                     {/* Strict Logic Requirement: Only show "Call" if no one is currently called */}
                                                     {!calledTicket && (
                                                         <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
-                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
+                                                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
                                                             Call Next
                                                         </button>
                                                     )}
                                                     <button onClick={() => { if (confirm(`Skip ${ticket.registration?.full_name}?`)) updateStatus(ticket, "skipped"); }}
-                                                        className="px-4 py-2.5 text-gray-500 hover:text-gray-300 hover:bg-gray-800/80 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-transparent hover:border-gray-700/50">
+                                                        className="flex-1 sm:flex-none px-6 py-2.5 text-gray-300 hover:text-white bg-[#1E1F22] hover:bg-[#25262B] border border-gray-800 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
                                                         Skip
                                                     </button>
                                                 </div>

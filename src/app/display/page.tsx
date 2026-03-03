@@ -35,6 +35,8 @@ export default function DisplayBoard() {
     const [cards, setCards] = useState<CompanyCard[]>([]);
     const [nowCalling, setNowCalling] = useState<{ name: string; company: string } | null>(null);
     const [calledVisible, setCalledVisible] = useState(true);
+    const [alertQueue, setAlertQueue] = useState<{ id: string; name: string; company: string }[]>([]);
+    const [isAlerting, setIsAlerting] = useState(false);
     const [time, setTime] = useState(new Date());
     const [isFullscreen, setIsFullscreen] = useState(false);
     const knownCalledTix = useRef<Set<string>>(new Set());
@@ -52,7 +54,7 @@ export default function DisplayBoard() {
             const map: Record<string, CompanyCard> = {};
             for (const c of comps ?? []) map[c.id] = { id: c.id, name: c.name, interviewing: null, called: null, pendingCount: 0 };
 
-            let newCalledTicket: { name: string; company: string } | null = null;
+            let newAlerts: { id: string; name: string; company: string }[] = [];
             const currentCalledIds = new Set<string>();
 
             for (const t of tickets ?? []) {
@@ -65,7 +67,7 @@ export default function DisplayBoard() {
                     map[t.company_id].called = reg;
                     currentCalledIds.add(t.id);
                     if (reg && !knownCalledTix.current.has(t.id)) {
-                        newCalledTicket = { name: reg.full_name, company: map[t.company_id].name };
+                        newAlerts.push({ id: t.id, name: reg.full_name, company: map[t.company_id].name });
                     }
                 } else if (t.status === "pending") {
                     map[t.company_id].pendingCount++;
@@ -74,13 +76,13 @@ export default function DisplayBoard() {
 
             setCards(Object.values(map));
 
-            if (newCalledTicket) {
-                setCalledVisible(false);
-                setTimeout(() => {
-                    setNowCalling(newCalledTicket);
-                    setCalledVisible(true);
-                }, 400);
-            } else if (currentCalledIds.size === 0) {
+            if (newAlerts.length > 0) {
+                setAlertQueue(prev => {
+                    const existingIds = new Set(prev.map(p => p.id));
+                    const uniqueNew = newAlerts.filter(n => !existingIds.has(n.id));
+                    return [...prev, ...uniqueNew];
+                });
+            } else if (currentCalledIds.size === 0 && alertQueue.length === 0 && !isAlerting) {
                 setNowCalling(null);
             }
 
@@ -91,6 +93,30 @@ export default function DisplayBoard() {
     }, [selectedDate]);
 
     /* ── Effects ────────────────────────────────────────────── */
+    useEffect(() => {
+        if (alertQueue.length > 0 && !isAlerting) {
+            setIsAlerting(true);
+            const currentAlert = alertQueue[0];
+
+            // Play sound effect
+            const audio = new Audio('/sfx/alert.mp3');
+            audio.play().catch(e => console.log('Audio autoplay blocked:', e));
+
+            // Fade out current ticket, fade in new ticket
+            setCalledVisible(false);
+            setTimeout(() => {
+                setNowCalling({ name: currentAlert.name, company: currentAlert.company });
+                setCalledVisible(true);
+
+                // Hold for 3 seconds before processing the next alert
+                setTimeout(() => {
+                    setAlertQueue(prev => prev.slice(1));
+                    setIsAlerting(false);
+                }, 3000);
+            }, 400);
+        }
+    }, [alertQueue, isAlerting]);
+
     useEffect(() => {
         fetchData();
         const clock = setInterval(() => setTime(new Date()), 1000);
