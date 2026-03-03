@@ -124,7 +124,8 @@ export default function DisplayBoard() {
         }
     };
 
-    const cols = cards.length <= 4 ? "grid-cols-2 lg:grid-cols-2" : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+    // Optimizing layout: if 6 companies, use 3 columns evenly. 
+    const cols = cards.length <= 4 ? "grid-cols-2" : cards.length === 6 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 
     return (
         <div className="h-screen w-screen overflow-hidden bg-stone-50 flex flex-col font-sans select-none text-stone-900">
@@ -141,12 +142,13 @@ export default function DisplayBoard() {
                             <p className="text-stone-500 text-xs font-medium uppercase tracking-wider">Live Status</p>
                         </div>
                     </div>
-                    <div className="flex gap-1.5 bg-stone-100 p-1 rounded-lg border border-stone-200">
+                    {/* Notion-style Pill Toggles */}
+                    <div className="flex gap-1.5 bg-stone-100/80 p-1 rounded-xl border border-stone-200/60 shadow-inner">
                         {DATES.map(d => (
                             <button
                                 key={d.value}
                                 onClick={() => setSelectedDate(d.value)}
-                                className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${selectedDate === d.value ? "bg-white text-stone-900 shadow-sm border border-stone-200/50" : "text-stone-500 hover:text-stone-700 hover:bg-stone-200/50"}`}
+                                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ease-out ${selectedDate === d.value ? "bg-white text-stone-900 shadow-sm border border-stone-200/50 scale-100" : "text-stone-500 hover:text-stone-700 hover:bg-stone-200/40 scale-95 hover:scale-100"}`}
                             >
                                 {d.label}
                             </button>
@@ -205,21 +207,21 @@ export default function DisplayBoard() {
                     const isActive = hasInterview || hasCalled;
 
                     return (
-                        <div key={c.id} className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                        <div key={c.id} className={`rounded-2xl border ${isActive ? "border-stone-300 shadow-md ring-1 ring-stone-900/5 bg-white scale-[1.01]" : "border-stone-200 bg-stone-50/50 opacity-90"} overflow-hidden flex flex-col transition-all duration-300`}>
 
                             {/* Card Header */}
-                            <div className="px-5 py-4 border-b border-stone-100 bg-stone-50/50">
-                                <h2 className="font-bold text-lg text-stone-900 truncate">{c.name}</h2>
-                                <div className="flex items-center gap-2 mt-1.5">
-                                    <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider w-fit flex items-center gap-1.5
-                                        ${hasInterview ? "bg-green-100 text-green-700"
-                                            : hasCalled ? "bg-blue-100 text-blue-700"
-                                                : "bg-stone-100 text-stone-500"}`}>
-                                        {isActive && <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasInterview ? 'bg-green-500' : 'bg-blue-500'}`} />}
-                                        {hasInterview ? "In Session" : hasCalled ? "Arriving" : "Waiting"}
+                            <div className={`px-5 py-4 border-b ${hasInterview ? "bg-stone-900 border-stone-800" : hasCalled ? "bg-stone-800 border-stone-700" : "bg-stone-100 border-stone-200"}`}>
+                                <h2 className={`font-extrabold text-xl truncate ${isActive ? "text-white" : "text-stone-900"}`}>{c.name}</h2>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <div className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest w-fit flex items-center gap-1.5
+                                        ${hasInterview ? "bg-green-500/20 text-green-300"
+                                            : hasCalled ? "bg-blue-500/20 text-blue-300"
+                                                : "bg-stone-200 text-stone-600"}`}>
+                                        {isActive && <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasInterview ? 'bg-green-400' : 'bg-blue-400'}`} />}
+                                        {hasInterview ? "In Session" : hasCalled ? "Arriving" : "Available"}
                                     </div>
                                     {c.pendingCount > 0 && (
-                                        <div className="px-2 py-0.5 rounded-md text-[10px] bg-stone-100 text-stone-600 font-bold uppercase tracking-wider border border-stone-200">
+                                        <div className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border ${isActive ? "bg-white/10 text-stone-300 border-white/10" : "bg-stone-200 text-stone-600 border-stone-300"}`}>
                                             {c.pendingCount} in queue
                                         </div>
                                     )}
@@ -227,28 +229,29 @@ export default function DisplayBoard() {
                             </div>
 
                             {/* Card Body */}
-                            <div className="p-5 flex-1 flex flex-col justify-center gap-3 relative">
+                            <div className="p-5 flex-1 flex flex-col justify-center gap-3 relative bg-white">
                                 {!isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                        <p className="text-stone-400 font-medium text-sm">Room available</p>
+                                        <p className="text-stone-400 font-semibold text-sm uppercase tracking-widest">Waiting for candidates</p>
                                     </div>
                                 )}
 
                                 {c.interviewing && (
-                                    <div className={`rounded-xl p-4 border relative overflow-hidden ${hasCalled ? 'bg-stone-50 border-stone-100' : 'bg-green-50/50 border-green-100'}`}>
-                                        <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${hasCalled ? 'text-stone-400' : 'text-green-600'}`}>Current Interview</p>
-                                        <p className={`font-bold truncate ${hasCalled ? 'text-lg text-stone-700' : 'text-xl text-stone-900'}`}>{c.interviewing.full_name}</p>
-                                        <p className="text-stone-500 text-xs font-medium mt-0.5">{c.interviewing.student_number}</p>
+                                    <div className={`rounded-xl p-4 border relative overflow-hidden ${hasCalled ? 'bg-stone-100 border-stone-200' : 'bg-green-50 border-green-200 shadow-inner'}`}>
+                                        <p className={`text-[10px] font-extrabold uppercase tracking-widest mb-1 ${hasCalled ? 'text-stone-500' : 'text-green-700'}`}>Current Interview</p>
+                                        <p className={`font-black truncate ${hasCalled ? 'text-xl text-stone-800' : 'text-3xl text-stone-900 tracking-tight'}`}>{c.interviewing.full_name}</p>
+                                        <p className="text-stone-600 font-semibold mt-1">{c.interviewing.student_number}</p>
                                     </div>
                                 )}
 
                                 {c.called && (
-                                    <div className="rounded-xl p-4 bg-blue-50/50 border border-blue-100 relative overflow-hidden">
-                                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                                            <Volume2 className="w-3 h-3" /> Next Up
+                                    <div className="rounded-xl p-5 bg-blue-50/80 border-2 border-blue-200 relative overflow-hidden shadow-sm">
+                                        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500" />
+                                        <p className="text-[11px] font-extrabold text-blue-700 uppercase tracking-widest mb-1 flex items-center gap-1.5 ml-2">
+                                            <Volume2 className="w-4 h-4 animate-pulse" /> Next Up to Room
                                         </p>
-                                        <p className="font-bold text-xl text-stone-900 truncate">{c.called.full_name}</p>
-                                        <p className="text-stone-500 text-xs font-medium mt-0.5">{c.called.student_number}</p>
+                                        <p className="font-black text-2xl text-stone-900 truncate ml-2 tracking-tight">{c.called.full_name}</p>
+                                        <p className="text-stone-600 font-semibold mt-1 ml-2">{c.called.student_number}</p>
                                     </div>
                                 )}
                             </div>
