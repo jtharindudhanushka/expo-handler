@@ -133,9 +133,6 @@ export default function DisplayBoard() {
             <header className="flex-shrink-0 bg-[#131314] border-b border-gray-800/60 px-6 py-4 flex items-center justify-between gap-6 z-10">
                 <div className="flex items-center gap-6 min-w-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                            <Sparkles className="w-5 h-5 text-blue-400" />
-                        </div>
                         <div>
                             <p className="font-medium text-lg text-gray-100 leading-tight tracking-tight">Career Fair Queue</p>
                             <p className="text-gray-400 text-xs font-medium tracking-wide">Live Updates</p>
@@ -207,53 +204,51 @@ export default function DisplayBoard() {
                     const isActive = hasInterview || hasCalled;
 
                     return (
-                        <div key={c.id} className={`rounded-[24px] overflow-hidden flex flex-col transition-all duration-300 ${isActive ? "bg-[#1E1F22] border border-gray-700 shadow-xl" : "bg-[#131314]/80 border border-gray-800/50 opacity-90"}`}>
+                        <div key={c.id} className={`rounded-[16px] overflow-hidden flex flex-col transition-all duration-300 ${isActive ? "bg-[#1E1F22] shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)] border border-gray-800/80" : "bg-transparent border border-gray-800/30"}`}>
 
-                            {/* Card Header */}
-                            <div className={`px-6 py-5 border-b ${hasInterview ? "border-green-500/10 bg-green-500/5" : hasCalled ? "border-blue-500/10 bg-blue-500/5" : "border-gray-800/50 bg-[#1A1A1C]"}`}>
-                                <h2 className={`font-medium text-xl truncate ${isActive ? "text-gray-100" : "text-gray-300"}`}>{c.name}</h2>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <div className={`px-3 py-1 rounded-full text-[11px] font-medium tracking-wide w-fit flex items-center gap-2
-                                        ${hasInterview ? "bg-green-500/20 text-green-300"
-                                            : hasCalled ? "bg-blue-500/20 text-blue-300"
-                                                : "bg-gray-800/50 text-gray-500"}`}>
+                            {/* Card Header Minimal */}
+                            <div className={`px-6 py-4 flex items-center justify-between border-b ${isActive ? "border-gray-800/50 bg-[#25262B]/50" : "border-gray-800/30 bg-[#131314]/30"}`}>
+                                <h2 className={`font-semibold text-lg truncate ${isActive ? "text-gray-100" : "text-gray-400"}`}>{c.name}</h2>
+                                <div className="flex items-center gap-2">
+                                    <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider w-fit flex items-center gap-2
+                                        ${hasInterview ? "bg-green-500/10 text-green-400"
+                                            : hasCalled ? "bg-blue-500/10 text-blue-400"
+                                                : "bg-transparent text-gray-600"}`}>
                                         {isActive && <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${hasInterview ? 'bg-green-400' : 'bg-blue-400'}`} />}
                                         {hasInterview ? "In Session" : hasCalled ? "Arriving" : "Available"}
                                     </div>
                                     {c.pendingCount > 0 && (
-                                        <div className={`px-3 py-1 rounded-full text-[11px] font-medium tracking-wide border ${isActive ? "border-gray-700 bg-gray-800 text-gray-300" : "border-gray-800/50 bg-gray-900/50 text-gray-500"}`}>
+                                        <div className={`px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide ${isActive ? "text-gray-400" : "text-gray-600"}`}>
                                             {c.pendingCount} in queue
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Card Body */}
-                            <div className={`p-6 flex-1 flex flex-col justify-center gap-3 relative ${isActive ? 'bg-[#1E1F22]' : 'bg-[#131314]/50'}`}>
+                            {/* Card Body Minimal */}
+                            <div className={`p-6 flex-1 flex flex-col justify-center gap-3 relative min-h-[140px] ${isActive ? 'bg-[#1E1F22]' : 'bg-transparent'}`}>
                                 {!isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                        <p className="text-gray-600 font-medium text-sm">Waiting for candidates</p>
+                                        <p className="text-gray-700 font-medium text-sm">Waiting for candidates</p>
                                     </div>
                                 )}
 
                                 {c.interviewing && (
-                                    <div className={`rounded-[16px] p-5 relative overflow-hidden transition-all ${hasCalled ? 'bg-[#131314] border border-gray-800' : 'bg-green-500/10 border border-green-500/20'}`}>
-                                        <p className={`text-[11px] font-medium tracking-wide mb-1 flex items-center gap-1.5 ${hasCalled ? 'text-gray-500' : 'text-green-400'}`}>
+                                    <div className={`rounded-xl px-5 py-4 relative bg-[#1A1B1E]`}>
+                                        <p className={`text-[11px] font-medium tracking-wide mb-1 flex items-center gap-1.5 ${hasCalled ? 'text-gray-500' : 'text-green-500/80'}`}>
                                             Current Session
                                         </p>
-                                        <p className={`font-medium truncate tracking-tight ${hasCalled ? 'text-xl text-gray-300' : 'text-3xl text-gray-100'}`}>{c.interviewing.full_name}</p>
-                                        <p className="text-gray-500 text-sm mt-1">{c.interviewing.student_number}</p>
+                                        <p className={`font-medium truncate tracking-tight ${hasCalled ? 'text-xl text-gray-400' : 'text-2xl text-gray-100'}`}>{c.interviewing.full_name}</p>
                                     </div>
                                 )}
 
                                 {c.called && (
-                                    <div className="rounded-[16px] p-5 bg-blue-500/10 border border-blue-500/30 relative overflow-hidden shadow-[inset_0_0_15px_rgba(59,130,246,0.05)]">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
-                                        <p className="text-[11px] font-medium text-blue-300 tracking-wide mb-1 flex items-center gap-1.5 ml-2">
-                                            <Volume2 className="w-3.5 h-3.5 animate-pulse" /> Next Up to Room
+                                    <div className="rounded-xl px-5 py-4 bg-blue-500/5 border border-blue-500/10 relative">
+                                        <p className="text-[11px] font-medium text-blue-400/80 tracking-wide mb-1 flex items-center gap-1.5">
+                                            <Volume2 className="w-3.5 h-3.5 animate-pulse" /> Next Up
                                         </p>
-                                        <p className="font-medium text-2xl text-white truncate ml-2 tracking-tight">{c.called.full_name}</p>
-                                        <p className="text-blue-200/60 text-sm mt-1 ml-2">{c.called.student_number}</p>
+                                        <p className="font-medium text-xl text-white truncate tracking-tight mb-0.5">{c.called.full_name}</p>
+                                        <p className="text-gray-500 text-xs truncate">{c.called.student_number}</p>
                                     </div>
                                 )}
                             </div>

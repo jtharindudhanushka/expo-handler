@@ -145,9 +145,9 @@ export default function WaitingRoomBoard() {
                 </div>
             </div>
 
-            {/* Table Area */}
+            {/* Table Area Minimal */}
             <div className="flex-1 overflow-auto p-6">
-                <div className="max-w-7xl mx-auto bg-[#131314] border border-gray-800/60 rounded-[28px] overflow-hidden">
+                <div className="max-w-7xl mx-auto">
                     {loading ? (
                         <div className="p-16 text-center text-gray-500 animate-pulse font-medium">Loading network records...</div>
                     ) : filtered.length === 0 ? (
@@ -158,35 +158,35 @@ export default function WaitingRoomBoard() {
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-[#0A0A0B]/50 border-b border-gray-800/60 text-gray-500 text-[11px] uppercase tracking-widest font-bold">
+                                <thead className="border-b border-gray-800 text-gray-500 text-[11px] uppercase tracking-widest font-bold">
                                     <tr>
-                                        <th className="px-6 py-5 w-16 text-center">#</th>
-                                        <th className="px-6 py-5">Profile</th>
-                                        <th className="px-6 py-5 hidden sm:table-cell">Identity</th>
-                                        <th className="px-6 py-5">Routing</th>
-                                        <th className="px-6 py-5">Status</th>
+                                        <th className="px-6 py-4 w-16 text-center">#</th>
+                                        <th className="px-6 py-4">Profile</th>
+                                        <th className="px-6 py-4 hidden sm:table-cell">Identity</th>
+                                        <th className="px-6 py-4">Routing</th>
+                                        <th className="px-6 py-4">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-800/40">
                                     {filtered.map((ticket, i) => {
                                         const StatusIcon = STATUS_STYLE[ticket.status]?.icon || Clock;
                                         return (
-                                            <tr key={ticket.id} className="hover:bg-[#1A1B1E] transition-colors">
-                                                <td className="px-6 py-5 text-center text-gray-600 font-bold tabular-nums text-[11px]">{i + 1}</td>
-                                                <td className="px-6 py-5">
+                                            <tr key={ticket.id} className="hover:bg-gray-800/30 transition-colors">
+                                                <td className="px-6 py-4 text-center text-gray-600 font-bold tabular-nums text-[11px]">{i + 1}</td>
+                                                <td className="px-6 py-4">
                                                     <p className="font-medium text-gray-200">{ticket.registration?.full_name}</p>
                                                     <p className="text-gray-500 text-xs mt-1 sm:hidden">{ticket.registration?.student_number}</p>
                                                 </td>
-                                                <td className="px-6 py-5 hidden sm:table-cell">
+                                                <td className="px-6 py-4 hidden sm:table-cell">
                                                     <p className="text-gray-400 font-medium">{ticket.registration?.student_number}</p>
                                                     <p className="text-gray-600 text-[11px] font-bold uppercase tracking-widest mt-1">{ticket.registration?.level}</p>
                                                 </td>
-                                                <td className="px-6 py-5">
-                                                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-[#1E1F22] text-gray-400 border border-gray-800">
+                                                <td className="px-6 py-4">
+                                                    <span className="inline-flex items-center px-3 py-1.5 rounded-[8px] text-[11px] font-bold uppercase tracking-widest bg-gray-800/50 text-gray-400">
                                                         {ticket.company?.name || "Unassigned"}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-5">
+                                                <td className="px-6 py-4">
                                                     <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest border ${STATUS_STYLE[ticket.status]?.cls}`}>
                                                         <StatusIcon className="w-3.5 h-3.5" />
                                                         {STATUS_STYLE[ticket.status]?.label}

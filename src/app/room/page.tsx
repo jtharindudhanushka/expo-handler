@@ -188,9 +188,6 @@ export default function RoomLeadDashboard() {
             {/* Topbar (Google UI) */}
             <header className="sticky top-0 z-20 bg-[#0A0A0B]/80 backdrop-blur-xl border-b border-gray-800/60 px-4 md:px-6 py-3.5 flex items-center justify-between transition-all">
                 <div className="flex items-center gap-3.5">
-                    <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                        <Building2 className="w-4 h-4 text-blue-400" />
-                    </div>
                     <div>
                         <h1 className="font-medium text-sm leading-tight tracking-wide text-gray-100">Interviews</h1>
                         {profile && <p className="text-gray-500 text-[11px] font-medium tracking-wide mt-0.5">{profile.full_name}</p>}
@@ -267,23 +264,22 @@ export default function RoomLeadDashboard() {
 
                             {/* Currently Interviewing Card */}
                             {activeTicket && (
-                                <div className="bg-[#1A1A1E] border border-green-500/20 rounded-[28px] p-6 shadow-lg shadow-green-500/5 relative overflow-hidden group transition-all">
-                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-green-500"></div>
+                                <div className="bg-[#1A1B1E] rounded-2xl p-6 relative overflow-hidden group transition-all">
                                     <div className="flex items-center gap-2 mb-4">
-                                        <span className="relative flex h-2.5 w-2.5">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500/50 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                         </span>
-                                        <span className="text-[11px] font-bold text-green-400 uppercase tracking-widest">In Session</span>
+                                        <span className="text-[11px] font-medium text-green-500/80 tracking-wide">In Session</span>
                                     </div>
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                                         <div>
-                                            <h3 className="text-2xl font-medium text-white">{activeTicket.registration?.full_name}</h3>
-                                            <p className="text-sm text-gray-400 font-medium mt-1">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
+                                            <h3 className="text-xl font-medium text-gray-100">{activeTicket.registration?.full_name}</h3>
+                                            <p className="text-[13px] text-gray-500 mt-1">{activeTicket.registration?.student_number} · {activeTicket.registration?.level}</p>
                                         </div>
                                         <button onClick={() => { if (confirm("Mark interview as completed?")) updateStatus(activeTicket, "completed"); }}
-                                            className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 rounded-2xl text-sm font-medium transition-all">
-                                            <CheckCircle2 className="w-5 h-5" /> Complete
+                                            className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 bg-[#25262B] hover:bg-[#2C2D33] text-gray-300 rounded-xl text-sm font-medium transition-all">
+                                            <CheckCircle2 className="w-4 h-4" /> Complete
                                         </button>
                                     </div>
                                 </div>
@@ -291,24 +287,23 @@ export default function RoomLeadDashboard() {
 
                             {/* Called Ticket Card (Walking to room) */}
                             {calledTicket && (
-                                <div className="bg-[#13141A] border border-blue-500/30 rounded-[28px] p-6 shadow-[0_4px_24px_-4px_rgba(59,130,246,0.1)] relative overflow-hidden transition-all">
-                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
-                                    <div className="flex items-center gap-2.5 mb-4">
-                                        <Volume2 className="w-4 h-4 text-blue-400 animate-pulse" />
-                                        <span className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Arriving Next</span>
+                                <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-6 relative transition-all">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Volume2 className="w-4 h-4 text-blue-400/80 animate-pulse" />
+                                        <span className="text-[11px] font-medium text-blue-400/80 tracking-wide">Arriving Next</span>
                                     </div>
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                                         <div>
-                                            <h3 className="text-xl font-medium text-white">{calledTicket.registration?.full_name}</h3>
-                                            <p className="text-sm text-gray-400 font-medium mt-1">{calledTicket.registration?.student_number}</p>
+                                            <h3 className="text-xl font-medium text-gray-100">{calledTicket.registration?.full_name}</h3>
+                                            <p className="text-[13px] text-gray-500 mt-1">{calledTicket.registration?.student_number}</p>
                                         </div>
                                         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                                             <button onClick={() => { if (confirm(`Start interview with ${calledTicket.registration?.full_name}?`)) updateStatus(calledTicket, "interviewing"); }} disabled={!!activeTicket}
-                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-20 disabled:grayscale text-white rounded-2xl text-sm font-medium transition-all">
+                                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-20 disabled:grayscale text-white rounded-xl text-sm font-medium transition-all">
                                                 Begin <span className="hidden sm:inline">Session</span>
                                             </button>
                                             <button onClick={() => { if (confirm(`Mark ${calledTicket.registration?.full_name} as No Show?`)) updateStatus(calledTicket, "skipped"); }}
-                                                className="flex items-center justify-center gap-2 px-4 py-3.5 text-gray-400 hover:text-gray-200 hover:bg-[#1E1F22] border border-transparent hover:border-gray-800 rounded-2xl text-sm font-medium transition-all">
+                                                className="flex items-center justify-center gap-2 px-4 py-3 text-gray-500 hover:text-gray-300 hover:bg-[#25262B] rounded-xl transition-colors">
                                                 <UserMinus className="w-4 h-4" />
                                             </button>
                                         </div>
