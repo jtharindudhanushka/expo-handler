@@ -314,16 +314,14 @@ export default function DisplayBoard() {
                                             </span>
                                             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest shrink-0">Current Session</p>
                                         </div>
-                                        <div className="flex flex-wrap gap-1.5">
+                                        <div className="flex flex-col gap-1.5 pl-4 border-l-2 border-green-500/20 py-1">
                                             {c.interviewing.map((reg, idx) => {
-                                                const totalActive = c.interviewing.length + c.called.length;
+                                                const words = reg.full_name.split(" ");
+                                                const displayName = words.length > 2 ? `${words[0]} ${words[1]}` : reg.full_name;
                                                 return (
-                                                    <div key={idx} className={`flex flex-col bg-green-500/5 border border-green-500/10 rounded-md px-2.5 py-1 ${totalActive >= 4 ? 'w-[calc(50%-0.2rem)]' : 'w-full'}`}>
-                                                        <p className={`font-medium tracking-tight text-green-50 leading-tight break-words 
-                                                            ${totalActive >= 6 ? 'text-[11px]' : totalActive >= 4 ? 'text-xs sm:text-sm' : 'text-lg sm:text-[20px]'}`}>
-                                                            {reg.full_name}
-                                                        </p>
-                                                    </div>
+                                                    <p key={idx} className="font-medium tracking-tight text-green-50 text-[17px] leading-tight">
+                                                        {displayName}
+                                                    </p>
                                                 );
                                             })}
                                         </div>
@@ -331,24 +329,19 @@ export default function DisplayBoard() {
                                 )}
 
                                 {hasCalled && (
-                                    <div className={`flex flex-col gap-1.5 ${hasInterview ? "mt-1 pt-2 border-t border-gray-800/40" : "mt-auto"}`}>
+                                    <div className={`flex flex-col gap-1.5 ${hasInterview ? "mt-2 pt-3 border-t border-gray-800/40" : "mt-auto"}`}>
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <Volume2 className="w-3 h-3 text-blue-500 animate-pulse shrink-0" />
                                             <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest shrink-0">Next Up to Room</p>
                                         </div>
-                                        <div className="flex flex-wrap gap-1.5">
+                                        <div className="flex flex-col gap-1.5 pl-4 border-l-2 border-blue-500/20 py-1">
                                             {c.called.map((reg, idx) => {
-                                                const totalActive = c.interviewing.length + c.called.length;
+                                                const words = reg.full_name.split(" ");
+                                                const displayName = words.length > 2 ? `${words[0]} ${words[1]}` : reg.full_name;
                                                 return (
-                                                    <div key={idx} className={`flex flex-col gap-0.5 bg-blue-500/5 border border-blue-500/10 rounded-md px-2.5 py-1 ${totalActive >= 4 ? 'w-[calc(50%-0.2rem)]' : 'w-full'}`}>
-                                                        <p className={`font-semibold tracking-tight text-blue-300 leading-tight break-words 
-                                                            ${totalActive >= 6 ? 'text-[11px]' : totalActive >= 4 ? 'text-xs sm:text-sm' : 'text-lg sm:text-[19px]'}`}>
-                                                            {reg.full_name}
-                                                        </p>
-                                                        {totalActive < 4 && (
-                                                            <p className="text-gray-500 text-[10px] sm:text-[11px] truncate tracking-wide">{reg.student_number}</p>
-                                                        )}
-                                                    </div>
+                                                    <p key={idx} className="font-semibold tracking-tight text-blue-300 text-[18px] leading-tight flex items-center gap-3">
+                                                        <span>{displayName}</span>
+                                                    </p>
                                                 );
                                             })}
                                         </div>
