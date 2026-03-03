@@ -17,7 +17,7 @@ export async function GET(req: Request) {
         const [{ data: comps }, { data: tickets }] = await Promise.all([
             supabase
                 .from("companies")
-                .select("id, name, interview_date")
+                .select("id, name, interview_date, room_number")
                 .eq("interview_date", date)
                 .order("name"),
             supabase

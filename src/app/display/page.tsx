@@ -51,7 +51,8 @@ export default function DisplayBoard() {
     /* ── Data fetch ─────────────────────────────────────────── */
     const fetchData = useCallback(async () => {
         try {
-            const res = await fetch(`/api/display/live?date=${selectedDate}`);
+            // Add cache-busting timestamp and Next cache disabler to guarantee Vercel pulls live DB data
+            const res = await fetch(`/api/display/live?date=${selectedDate}&_t=${Date.now()}`, { cache: "no-store" });
             if (!res.ok) return;
             const { companies: comps, tickets } = await res.json();
 
@@ -296,8 +297,8 @@ export default function DisplayBoard() {
                                 </div>
                             </div>
 
-                            {/* Card Body Scalable Wrap */}
-                            <div className={`px-5 py-4 flex-1 flex flex-col gap-4 relative bg-transparent ${isActive ? "" : "min-h-[160px] justify-center"}`}>
+                            {/* Card Body Ultra-Scalable Flex Wrap */}
+                            <div className={`px-5 py-4 flex-1 flex flex-col gap-2.5 relative bg-transparent ${isActive ? "" : "min-h-[160px] justify-center"}`}>
                                 {!isActive && (
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <p className="text-gray-700 font-medium text-sm">Waiting for candidates</p>
@@ -305,43 +306,51 @@ export default function DisplayBoard() {
                                 )}
 
                                 {hasInterview && (
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center gap-2 mb-1">
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex items-center gap-2 mb-0.5">
                                             <span className="relative flex h-2 w-2 shrink-0">
                                                 <span className="animate-ping absolute h-full w-full rounded-full bg-green-500/50"></span>
                                                 <span className="relative rounded-full h-2 w-2 bg-green-500"></span>
                                             </span>
-                                            <p className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-widest shrink-0">Current Session</p>
+                                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest shrink-0">Current Session</p>
                                         </div>
-                                        <div className={`grid gap-2 ${c.interviewing.length > 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-                                            {c.interviewing.map((reg, idx) => (
-                                                <div key={idx} className="flex flex-col min-w-0">
-                                                    <p className={`font-medium tracking-tight leading-snug text-gray-100 break-words ${c.interviewing.length + c.called.length >= 4 ? 'text-sm' : c.interviewing.length > 2 ? 'text-base' : 'text-lg sm:text-[20px]'}`}>
-                                                        {reg.full_name}
-                                                    </p>
-                                                </div>
-                                            ))}
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {c.interviewing.map((reg, idx) => {
+                                                const totalActive = c.interviewing.length + c.called.length;
+                                                return (
+                                                    <div key={idx} className={`flex flex-col bg-green-500/5 border border-green-500/10 rounded-md px-2.5 py-1 ${totalActive >= 4 ? 'w-[calc(50%-0.2rem)]' : 'w-full'}`}>
+                                                        <p className={`font-medium tracking-tight text-green-50 leading-tight break-words 
+                                                            ${totalActive >= 6 ? 'text-[11px]' : totalActive >= 4 ? 'text-xs sm:text-sm' : 'text-lg sm:text-[20px]'}`}>
+                                                            {reg.full_name}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
 
                                 {hasCalled && (
-                                    <div className={`flex flex-col gap-2 ${hasInterview ? "mt-2 pt-3 border-t border-gray-800/40" : "mt-auto"}`}>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Volume2 className="w-3.5 h-3.5 text-blue-500 animate-pulse shrink-0" />
-                                            <p className="text-[10px] sm:text-[11px] font-bold text-blue-500 uppercase tracking-widest shrink-0">Next Up to Room</p>
+                                    <div className={`flex flex-col gap-1.5 ${hasInterview ? "mt-1 pt-2 border-t border-gray-800/40" : "mt-auto"}`}>
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <Volume2 className="w-3 h-3 text-blue-500 animate-pulse shrink-0" />
+                                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest shrink-0">Next Up to Room</p>
                                         </div>
-                                        <div className={`grid gap-2 sm:gap-3 ${c.called.length > 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-                                            {c.called.map((reg, idx) => (
-                                                <div key={idx} className="flex flex-col gap-0.5 min-w-0">
-                                                    <p className={`font-semibold text-blue-400 tracking-tight leading-snug break-words ${c.interviewing.length + c.called.length >= 4 ? 'text-sm' : c.called.length > 2 ? 'text-base' : 'text-lg sm:text-[19px]'}`}>
-                                                        {reg.full_name}
-                                                    </p>
-                                                    {c.interviewing.length + c.called.length < 4 && (
-                                                        <p className="text-gray-500 text-[11px] truncate">{reg.student_number}</p>
-                                                    )}
-                                                </div>
-                                            ))}
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {c.called.map((reg, idx) => {
+                                                const totalActive = c.interviewing.length + c.called.length;
+                                                return (
+                                                    <div key={idx} className={`flex flex-col gap-0.5 bg-blue-500/5 border border-blue-500/10 rounded-md px-2.5 py-1 ${totalActive >= 4 ? 'w-[calc(50%-0.2rem)]' : 'w-full'}`}>
+                                                        <p className={`font-semibold tracking-tight text-blue-300 leading-tight break-words 
+                                                            ${totalActive >= 6 ? 'text-[11px]' : totalActive >= 4 ? 'text-xs sm:text-sm' : 'text-lg sm:text-[19px]'}`}>
+                                                            {reg.full_name}
+                                                        </p>
+                                                        {totalActive < 4 && (
+                                                            <p className="text-gray-500 text-[10px] sm:text-[11px] truncate tracking-wide">{reg.student_number}</p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
