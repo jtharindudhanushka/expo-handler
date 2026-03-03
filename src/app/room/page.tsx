@@ -343,8 +343,8 @@ export default function RoomLeadDashboard() {
                                             </span>
                                         </div>
                                         <div className="flex gap-2 w-full sm:w-auto">
-                                            {/* Allow calling next even if someone else is being interviewed — reduces wait */}
-                                            {!calledTicket && (
+                                            {/* Allow calling next even if someone else is being interviewed or called — reduces wait */}
+                                            {ticket.status === "pending" && (
                                                 <button onClick={() => { if (confirm(`Call ${ticket.registration?.full_name} to the room?`)) updateStatus(ticket, "called"); }}
                                                     className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-sm transition-all">
                                                     Call to Room
