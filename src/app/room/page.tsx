@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, MonitorUp, AlertCircle, CheckCircle2, Volume2, UserMinus, Plus, Sparkles, Building2 } from "lucide-react";
 
 interface Company { id: string; name: string; interview_date: string }
-interface Registration { id: string; full_name: string; student_number: string; email: string; level: string }
+interface Registration { id: string; full_name: string; student_number: string; email: string; level: string; is_present: boolean; }
 interface Ticket {
     id: string; status: string; position: number; created_at: string;
     registration_id: string;
@@ -24,6 +24,7 @@ export default function RoomLeadDashboard() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [skippedTickets, setSkippedTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showPresentOnly, setShowPresentOnly] = useState(false);
     const [profile, setProfile] = useState<{ full_name: string; role: string; company_id: string | null } | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [conflict, setConflict] = useState<{ ticketId: string; msg: string } | null>(null);
@@ -60,7 +61,7 @@ export default function RoomLeadDashboard() {
         if (!selectedCompany) { setTickets([]); return; }
         const { data } = await supabase
             .from("queue_tickets")
-            .select("id, status, position, created_at, registration_id, registration:registrations(id, full_name, student_number, email, level)")
+            .select("id, status, position, created_at, registration_id, registration:registrations(id, full_name, student_number, email, level, is_present)")
             .eq("company_id", selectedCompany)
             .in("status", ["pending", "called", "interviewing"])
             .order("position", { ascending: true });
@@ -68,7 +69,7 @@ export default function RoomLeadDashboard() {
 
         const { data: skipped } = await supabase
             .from("queue_tickets")
-            .select("id, status, position, created_at, registration_id, registration:registrations(id, full_name, student_number, email, level)")
+            .select("id, status, position, created_at, registration_id, registration:registrations(id, full_name, student_number, email, level, is_present)")
             .eq("company_id", selectedCompany)
             .in("status", ["skipped"])
             .order("position", { ascending: true });
@@ -180,7 +181,7 @@ export default function RoomLeadDashboard() {
 
     const activeTickets = tickets.filter(t => t.status === "interviewing");
     const calledTickets = tickets.filter(t => t.status === "called");
-    const queueTickets = tickets.filter(t => t.status === "pending");
+    const queueTickets = tickets.filter(t => t.status === "pending" && (!showPresentOnly || t.registration?.is_present));
     const selectedComp = companies.find(c => c.id === selectedCompany);
 
     return (
@@ -311,9 +312,18 @@ export default function RoomLeadDashboard() {
 
                         {/* Roster / Queue List */}
                         <div className="mt-10">
-                            <div className="flex items-center justify-between mb-5 px-1">
-                                <h3 className="text-[13px] font-bold text-gray-300 tracking-wide">Queue List</h3>
-                                <div className="px-3 py-1 bg-[#1A1A1E] text-gray-400 text-[11px] font-bold tracking-widest uppercase rounded-full">{queueTickets.length} Total</div>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3 px-1">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-[13px] font-bold text-gray-300 tracking-wide">Queue List</h3>
+                                    <div className="px-3 py-1 bg-[#1A1A1E] text-gray-400 text-[11px] font-bold tracking-widest uppercase rounded-full">{queueTickets.length} Total</div>
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer touch-manipulation">
+                                    <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showPresentOnly ? 'bg-green-500' : 'bg-gray-700'}`}>
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showPresentOnly ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </div>
+                                    <input type="checkbox" className="sr-only" checked={showPresentOnly} onChange={() => setShowPresentOnly(!showPresentOnly)} />
+                                    <span className="text-xs font-bold uppercase tracking-widest text-gray-400 select-none">Show Present Only</span>
+                                </label>
                             </div>
 
                             <div className="bg-[#131314] border border-gray-800/60 rounded-[28px] overflow-hidden">
@@ -328,7 +338,12 @@ export default function RoomLeadDashboard() {
                                                 <div className="flex items-center gap-4 w-full sm:w-auto">
                                                     <span className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center text-[11px] font-bold text-gray-500 select-none border border-gray-700/50">{i + 1}</span>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-base font-medium text-gray-200 truncate">{ticket.registration?.full_name}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-base font-medium text-gray-200 truncate">{ticket.registration?.full_name}</p>
+                                                            {ticket.registration?.is_present && (
+                                                                <span className="shrink-0 px-1.5 py-0.5 rounded mr-2 bg-green-500/20 text-green-400 text-[9px] font-bold uppercase tracking-widest border border-green-500/20">Present</span>
+                                                            )}
+                                                        </div>
                                                         <p className="text-[13px] text-gray-500 mt-0.5 truncate">{ticket.registration?.student_number} <span className="mx-1.5 opacity-40">|</span> {ticket.registration?.level}</p>
                                                     </div>
                                                 </div>

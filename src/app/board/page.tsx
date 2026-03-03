@@ -11,7 +11,7 @@ interface Ticket {
     created_at: string;
     registration_id: string;
     company_id: string;
-    registration?: { full_name: string; student_number: string; level: string };
+    registration?: { full_name: string; student_number: string; level: string; is_present: boolean };
     company?: { name: string };
 }
 
@@ -27,6 +27,7 @@ export default function WaitingRoomBoard() {
     const [time, setTime] = useState(new Date());
     const [filter, setFilter] = useState<"all" | "pending" | "called" | "interviewing">("all");
     const [search, setSearch] = useState("");
+    const [showPresentOnly, setShowPresentOnly] = useState(false);
     const [authed, setAuthed] = useState(false);
     const supabase = createClient();
     const router = useRouter();
@@ -43,7 +44,7 @@ export default function WaitingRoomBoard() {
     const fetchTickets = async () => {
         const { data } = await supabase
             .from("queue_tickets")
-            .select("id, status, position, created_at, registration_id, company_id, registration:registrations(full_name, student_number, level), company:companies(name)")
+            .select("id, status, position, created_at, registration_id, company_id, registration:registrations(full_name, student_number, level, is_present), company:companies(name)")
             .in("status", ["pending", "called", "interviewing"])
             .order("company_id")
             .order("position", { ascending: true });
@@ -76,7 +77,8 @@ export default function WaitingRoomBoard() {
     const filtered = tickets.filter(t => {
         const matchStatus = filter === "all" || t.status === filter;
         const matchSearch = !search || t.registration?.full_name.toLowerCase().includes(search.toLowerCase()) || t.registration?.student_number?.toLowerCase().includes(search.toLowerCase());
-        return matchStatus && matchSearch;
+        const matchPreset = !showPresentOnly || t.registration?.is_present;
+        return matchStatus && matchSearch && matchPreset;
     });
 
     const counts = {
@@ -133,6 +135,13 @@ export default function WaitingRoomBoard() {
                                         : <><CheckCircle2 className="w-3.5 h-3.5" /> Session ({counts.interviewing})</>}
                         </button>
                     ))}
+                    <label className="flex sm:ml-4 items-center gap-2 cursor-pointer touch-manipulation">
+                        <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showPresentOnly ? 'bg-green-500' : 'bg-gray-800'}`}>
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showPresentOnly ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </div>
+                        <input type="checkbox" className="sr-only" checked={showPresentOnly} onChange={() => setShowPresentOnly(!showPresentOnly)} />
+                        <span className="text-xs font-bold uppercase tracking-widest text-gray-400 select-none">Present Only</span>
+                    </label>
                 </div>
                 <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2.5 bg-[#131314] border border-gray-800 rounded-full px-4 py-2 text-gray-400 focus-within:border-blue-500/50 focus-within:bg-[#1A1A1E] transition-all">
                     <Search className="w-4 h-4" />
@@ -174,7 +183,12 @@ export default function WaitingRoomBoard() {
                                             <tr key={ticket.id} className="hover:bg-gray-800/30 transition-colors">
                                                 <td className="px-6 py-4 text-center text-gray-600 font-bold tabular-nums text-[11px]">{i + 1}</td>
                                                 <td className="px-6 py-4">
-                                                    <p className="font-medium text-gray-200">{ticket.registration?.full_name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-medium text-gray-200">{ticket.registration?.full_name}</p>
+                                                        {ticket.registration?.is_present && (
+                                                            <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[9px] font-bold uppercase tracking-widest border border-green-500/20 shrink-0">Present</span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-gray-500 text-xs mt-1 sm:hidden">{ticket.registration?.student_number}</p>
                                                 </td>
                                                 <td className="px-6 py-4 hidden sm:table-cell">
