@@ -207,7 +207,7 @@ export default function DisplayBoard() {
                             </div>
                         </div>
                     ) : (
-                        <div className="text-center text-gray-500 text-sm font-medium">Waiting for next call...</div>
+                        <div className="text-center text-gray-500 text-sm font-medium">Please proceed to your room when the name appears</div>
                     )}
                 </div>
 
@@ -332,7 +332,7 @@ export default function DisplayBoard() {
                                     <div className={`flex flex-col gap-1.5 ${hasInterview ? "mt-2 pt-3 border-t border-gray-800/40" : "mt-auto"}`}>
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <Volume2 className="w-3 h-3 text-blue-500 animate-pulse shrink-0" />
-                                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest shrink-0">Next Up to Room</p>
+                                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest shrink-0">Please proceed to the room</p>
                                         </div>
                                         <div className="flex flex-col gap-1.5 pl-4 border-l-2 border-blue-500/20 py-1">
                                             {c.called.map((reg, idx) => {

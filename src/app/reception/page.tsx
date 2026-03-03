@@ -10,6 +10,10 @@ interface Registration {
     student_number: string;
     email: string;
     level: string;
+    faculty?: string;
+    department?: string;
+    employment_type?: string;
+    job_opportunities?: string;
     is_present: boolean;
 }
 
@@ -64,7 +68,7 @@ export default function ReceptionDashboard() {
     const fetchRegistrations = useCallback(async () => {
         const { data } = await supabase
             .from("registrations")
-            .select("id, full_name, student_number, email, level, is_present")
+            .select("id, full_name, student_number, email, level, faculty, department, employment_type, job_opportunities, is_present")
             .order("full_name", { ascending: true });
 
         setRegistrations((data || []) as Registration[]);
@@ -134,14 +138,18 @@ export default function ReceptionDashboard() {
     const presentCount = registrations.filter(r => r.is_present).length;
 
     const downloadCSV = () => {
-        const headers = ["Name", "Student Number", "Email", "Level", "Is Present"];
+        const headers = ["Name", "Student Number", "Email", "Faculty", "Department", "Level", "Employment Type", "Job Opportunities", "Is Present"];
         const csvRows = [
             headers.join(","),
             ...filteredRegs.map(r => [
                 `"${r.full_name?.replace(/"/g, '""') || ''}"`,
                 `"${r.student_number?.replace(/"/g, '""') || ''}"`,
                 `"${r.email?.replace(/"/g, '""') || ''}"`,
+                `"${r.faculty?.replace(/"/g, '""') || ''}"`,
+                `"${r.department?.replace(/"/g, '""') || ''}"`,
                 `"${r.level?.replace(/"/g, '""') || ''}"`,
+                `"${r.employment_type?.replace(/"/g, '""') || ''}"`,
+                `"${r.job_opportunities?.replace(/"/g, '""') || ''}"`,
                 r.is_present ? "Yes" : "No"
             ].join(","))
         ];
