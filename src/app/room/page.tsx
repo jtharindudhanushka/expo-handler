@@ -32,6 +32,8 @@ export default function RoomLeadDashboard() {
     const router = useRouter();
     const supabase = createClient();
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    const regChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         const init = async () => {
@@ -81,18 +83,41 @@ export default function RoomLeadDashboard() {
 
     useEffect(() => {
         if (!selectedCompany) return;
-        if (channelRef.current) channelRef.current.unsubscribe();
 
-        const channel = supabase
-            .channel(`room-${selectedCompany}-${Date.now()}`)
+        // Tear down previous subscriptions and polling
+        if (channelRef.current) channelRef.current.unsubscribe();
+        if (regChannelRef.current) regChannelRef.current.unsubscribe();
+        if (pollingRef.current) clearInterval(pollingRef.current);
+
+        // 1. Real-time: queue_tickets for this company
+        const ticketChannel = supabase
+            .channel(`room-tickets-${selectedCompany}-${Date.now()}`)
             .on("postgres_changes", {
                 event: "*", schema: "public", table: "queue_tickets",
                 filter: `company_id=eq.${selectedCompany}`,
             }, () => fetchTickets())
             .subscribe();
 
-        channelRef.current = channel;
-        return () => { channel.unsubscribe(); };
+        // 2. Real-time: registrations (catches is_present changes)
+        const regChannel = supabase
+            .channel(`room-regs-${selectedCompany}-${Date.now()}`)
+            .on("postgres_changes", {
+                event: "UPDATE", schema: "public", table: "registrations",
+            }, () => fetchTickets())
+            .subscribe();
+
+        // 3. Polling fallback every 10 seconds in case WebSocket drops
+        const poll = setInterval(() => fetchTickets(), 10000);
+
+        channelRef.current = ticketChannel;
+        regChannelRef.current = regChannel;
+        pollingRef.current = poll;
+
+        return () => {
+            ticketChannel.unsubscribe();
+            regChannel.unsubscribe();
+            clearInterval(poll);
+        };
     }, [selectedCompany, fetchTickets, supabase]);
 
     const checkConflict = async (registrationId: string, currentTicketId: string): Promise<string | null> => {
