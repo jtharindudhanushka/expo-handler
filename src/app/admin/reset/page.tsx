@@ -10,7 +10,32 @@ export default function ResetPage() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<ResetResult>(null);
     const [scope, setScope] = useState<"active" | "all">("active");
+
+    // Attendance reset state
+    const [attendanceLoading, setAttendanceLoading] = useState(false);
+    const [attendanceDone, setAttendanceDone] = useState(false);
+
     const supabase = createClient();
+
+    const handleResetAttendance = async () => {
+        if (!confirm("This will clear ALL is_present flags for every registrant. Continue?")) return;
+        setAttendanceLoading(true);
+        setAttendanceDone(false);
+        try {
+            const res = await fetch("/api/reception/reset-attendance", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+            if (!res.ok) throw new Error((await res.json()).error || "Failed");
+            setAttendanceDone(true);
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setAttendanceLoading(false);
+        }
+    };
+
 
     const handleReset = async () => {
         setLoading(true);
@@ -114,6 +139,42 @@ export default function ResetPage() {
                         </button>
                     </div>
                 )}
+            </div>
+
+            {/* Attendance Reset */}
+            <div className="mt-8">
+                <h2 className="text-xl font-black text-white mb-1">Attendance Reset</h2>
+                <p className="text-slate-400 text-sm mb-4">Clear all <code className="bg-slate-800 px-1 rounded text-amber-300">is_present</code> flags to test the Day 2 arrival queue flow.</p>
+
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <span className="text-amber-400 text-2xl">⚡</span>
+                        <div>
+                            <p className="text-amber-300 font-bold">Attendance Reset</p>
+                            <p className="text-slate-400 text-sm mt-1">
+                                Marks every registrant as <strong>not present</strong>. Use this to simulate a fresh day arrival. Registration records and queue tickets are not affected.
+                            </p>
+                        </div>
+                    </div>
+
+                    {attendanceDone ? (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-center">
+                            <p className="text-emerald-400 font-bold">✓ Attendance cleared successfully!</p>
+                            <p className="text-slate-400 text-sm mt-1">All is_present flags set to false.</p>
+                            <button onClick={() => setAttendanceDone(false)} className="mt-3 px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-semibold transition-all">
+                                Reset Again
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleResetAttendance}
+                            disabled={attendanceLoading}
+                            className="w-full py-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-bold rounded-xl transition-all disabled:opacity-50"
+                        >
+                            {attendanceLoading ? "Clearing..." : "Clear All Attendance Marks"}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
