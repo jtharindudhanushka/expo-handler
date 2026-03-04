@@ -19,9 +19,9 @@ export async function GET(req: NextRequest) {
         if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
         const { searchParams } = new URL(req.url);
-        const date = searchParams.get("date"); // e.g. "2026-03-04" or empty = all
+        const date = searchParams.get("date"); // e.g. "2026-03-03" or empty = all
 
-        // 1. Fetch companies for the selected date (sorted deterministically for column order)
+        // 1. Fetch companies (all or for selected date)
         let companiesQuery = supabaseAdmin
             .from("companies")
             .select("id, name, room_number, interview_date")
@@ -31,31 +31,14 @@ export async function GET(req: NextRequest) {
         const { data: companies } = await companiesQuery;
         const companyList = companies || [];
         const companyMap: Record<string, { name: string; room_number: string; interview_date: string }> = {};
-        for (const c of companyList) companyMap[c.id] = { name: c.name, room_number: c.room_number, interview_date: c.interview_date };
+        for (const c of companyList) companyMap[c.id] = c;
         const companyIds = companyList.map(c => c.id);
 
-        // 2. Fetch ALL queue tickets for those companies
-        const { data: tickets } = companyIds.length > 0
-            ? await supabaseAdmin
-                .from("queue_tickets")
-                .select("id, registration_id, company_id, status, position, created_at, interview_started_at, interview_ended_at, interview_duration_minutes")
-                .in("company_id", companyIds)
-            : { data: [] };
-
-        // 3. Group tickets by registration_id → company_id
-        type TicketRow = {
-            id: string; company_id: string; status: string; position: number;
-            created_at: string; interview_started_at: string | null;
-            interview_ended_at: string | null; interview_duration_minutes: number | null;
-        };
-        const ticketsByReg: Record<string, Record<string, TicketRow>> = {};
-        for (const t of (tickets || []) as TicketRow[]) {
-            if (!ticketsByReg[t.registration_id]) ticketsByReg[t.registration_id] = {};
-            ticketsByReg[t.registration_id][t.company_id] = t;
-        }
-
-        // 4. Fetch all relevant registrations (anyone who has at least one ticket)
-        const registrationIds = Object.keys(ticketsByReg);
+        // 2. Fetch ALL registrations — this is the base, not tickets
+        const { data: allRegs } = await supabaseAdmin
+            .from("registrations")
+            .select("id, university, full_name, student_number, email, contact_number, faculty, department, level, employment_type, job_opportunities, companies_march3, companies_march4, is_present, created_at, cv_link")
+            .order("full_name");
 
         type RegRow = {
             id: string; university: string; full_name: string; student_number: string;
@@ -65,15 +48,46 @@ export async function GET(req: NextRequest) {
             is_present: boolean; created_at: string; cv_link: string;
         };
 
-        const { data: registrations } = registrationIds.length > 0
-            ? await supabaseAdmin
-                .from("registrations")
-                .select("id, university, full_name, student_number, email, contact_number, faculty, department, level, employment_type, job_opportunities, companies_march3, companies_march4, is_present, created_at, cv_link")
-                .in("id", registrationIds)
-                .order("full_name")
-            : { data: [] as RegRow[] };
+        const registrations = (allRegs || []) as RegRow[];
 
-        // 5. Build headers — fixed personal info columns + dynamic per-company columns
+        // 3. If filtering by date, only include registrations that selected at least
+        //    one company on that date (via companies_march3 / companies_march4 text columns)
+        //    This is approximate — if date is set we also cross-reference ticket existence below.
+        //    For "all days" we include everyone.
+        let filteredRegs = registrations;
+        if (date) {
+            const companyNamesForDate = companyList.map(c => c.name.toLowerCase());
+            const isDateMarch3 = date === "2026-03-03";
+            filteredRegs = registrations.filter(reg => {
+                const col = isDateMarch3 ? (reg.companies_march3 || "") : (reg.companies_march4 || "");
+                return companyNamesForDate.some(name => col.toLowerCase().includes(name));
+            });
+        }
+
+        // 4. Fetch all queue tickets for those companies
+        type TicketRow = {
+            id: string; registration_id: string; company_id: string; status: string;
+            position: number; created_at: string;
+            interview_started_at: string | null;
+            interview_ended_at: string | null;
+            interview_duration_minutes: number | null;
+        };
+
+        const { data: tickets } = companyIds.length > 0
+            ? await supabaseAdmin
+                .from("queue_tickets")
+                .select("id, registration_id, company_id, status, position, created_at, interview_started_at, interview_ended_at, interview_duration_minutes")
+                .in("company_id", companyIds)
+            : { data: [] as TicketRow[] };
+
+        // Group tickets: registrationId → companyId → ticket
+        const ticketsByReg: Record<string, Record<string, TicketRow>> = {};
+        for (const t of (tickets || []) as TicketRow[]) {
+            if (!ticketsByReg[t.registration_id]) ticketsByReg[t.registration_id] = {};
+            ticketsByReg[t.registration_id][t.company_id] = t;
+        }
+
+        // 5. Build headers
         const fmt = (d: string | null) => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Colombo" }) : "";
 
         const personalHeaders = [
@@ -83,7 +97,7 @@ export async function GET(req: NextRequest) {
             "Registered At", "Is Present",
         ];
 
-        // For each company: 6 columns
+        // 6 dynamic columns per company
         const companyHeaders: string[] = [];
         for (const c of companyList) {
             const label = `${c.name} (${c.interview_date})`;
@@ -102,7 +116,7 @@ export async function GET(req: NextRequest) {
         // 6. Build one row per registrant
         const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-        const rows = ((registrations as RegRow[]) || []).map(reg => {
+        const rows = filteredRegs.map(reg => {
             const personalCols = [
                 escape(reg.full_name),
                 escape(reg.university),
@@ -134,8 +148,8 @@ export async function GET(req: NextRequest) {
                         escape(ticket.interview_duration_minutes ?? ""),
                     );
                 } else {
-                    // Not queued for this company — fill with blanks
-                    companyCols.push("", "", "", "", "", "");
+                    // Not queued / ticket deleted — blanks
+                    companyCols.push(`""`, `""`, `""`, `""`, `""`, `""`);
                 }
             }
 
