@@ -2,7 +2,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { LogOut, Search, UserCheck, UserX, Sparkles, Building2, Download } from "lucide-react";
+import { LogOut, Search, UserCheck, Sparkles, Download, RotateCcw } from "lucide-react";
+
+const ATTENDANCE_DATES = [
+    { label: "March 3", value: "2026-03-03" },
+    { label: "March 4", value: "2026-03-04" },
+];
+function todayDate(): string {
+    const now = new Date();
+    const d = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    return ATTENDANCE_DATES.find(x => x.value === d)?.value ?? ATTENDANCE_DATES[1].value;
+}
 
 interface Registration {
     id: string;
@@ -27,6 +37,8 @@ export default function ReceptionDashboard() {
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState<{ full_name: string; role: string } | null>(null);
     const [filterPresent, setFilterPresent] = useState<"all" | "present" | "away">("all");
+    const [attendanceDate, setAttendanceDate] = useState<string>(todayDate);
+    const [resetting, setResetting] = useState(false);
 
     // Queue Management State
     const [activeTab, setActiveTab] = useState<"attendance" | "queues">("attendance");
@@ -92,24 +104,45 @@ export default function ReceptionDashboard() {
 
 
     const toggleAttendance = async (reg: Registration) => {
-        // Optimistic UI update
         const originalState = reg.is_present;
         const newState = !originalState;
 
+        // Optimistic UI update
         setRegistrations(prev => prev.map(r => r.id === reg.id ? { ...r, is_present: newState } : r));
 
         try {
             const res = await fetch("/api/reception/mark-present", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ registrationId: reg.id, isPresent: newState }),
+                body: JSON.stringify({
+                    registrationId: reg.id,
+                    isPresent: newState,
+                    attendanceDate,  // triggers arrival-based queue allocation
+                }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to mark attendance");
         } catch (err: any) {
             alert(`Error: ${err.message}`);
-            // Rollback optimistic update on failure
             setRegistrations(prev => prev.map(r => r.id === reg.id ? { ...r, is_present: originalState } : r));
+        }
+    };
+
+    const resetAttendance = async () => {
+        if (!confirm(`Reset ALL attendance marks for ${ATTENDANCE_DATES.find(d => d.value === attendanceDate)?.label ?? attendanceDate}? This cannot be undone.`)) return;
+        setResetting(true);
+        try {
+            const res = await fetch("/api/reception/reset-attendance", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ attendanceDate }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error || "Failed");
+            await fetchRegistrations();
+        } catch (err: any) {
+            alert(`Reset failed: ${err.message}`);
+        } finally {
+            setResetting(false);
         }
     };
 
@@ -249,6 +282,31 @@ export default function ReceptionDashboard() {
                         Manage Queues
                     </button>
                 </div>
+
+                {/* Attendance Date Selector */}
+                {activeTab === "attendance" && (
+                    <div className="flex items-center justify-between">
+                        <div className="flex bg-[#131314] p-1 rounded-2xl border border-gray-800/60 gap-1">
+                            {ATTENDANCE_DATES.map(d => (
+                                <button
+                                    key={d.value}
+                                    onClick={() => setAttendanceDate(d.value)}
+                                    className={`px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all ${attendanceDate === d.value ? "bg-blue-500 text-white shadow-md" : "text-gray-500 hover:text-gray-300 hover:bg-[#1E1F22]"}`}
+                                >
+                                    {d.label}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={resetAttendance}
+                            disabled={resetting}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest bg-[#1E1F22] border border-gray-800 text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all disabled:opacity-50"
+                        >
+                            <RotateCcw className={`w-3.5 h-3.5 ${resetting ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">{resetting ? 'Resetting...' : 'Reset Attendance'}</span>
+                        </button>
+                    </div>
+                )}
 
                 {/* Metrics (Only visible in Attendance Mode) */}
                 {activeTab === "attendance" && (
