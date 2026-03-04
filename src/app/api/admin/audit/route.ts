@@ -21,98 +21,128 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const date = searchParams.get("date"); // e.g. "2026-03-04" or empty = all
 
-        // 1. Fetch companies (optionally filter by date)
-        let companiesQuery = supabaseAdmin.from("companies").select("id, name, room_number, interview_date").order("interview_date").order("name");
+        // 1. Fetch companies for the selected date (sorted deterministically for column order)
+        let companiesQuery = supabaseAdmin
+            .from("companies")
+            .select("id, name, room_number, interview_date")
+            .order("interview_date")
+            .order("name");
         if (date) companiesQuery = companiesQuery.eq("interview_date", date);
         const { data: companies } = await companiesQuery;
+        const companyList = companies || [];
         const companyMap: Record<string, { name: string; room_number: string; interview_date: string }> = {};
-        for (const c of companies || []) companyMap[c.id] = { name: c.name, room_number: c.room_number, interview_date: c.interview_date };
+        for (const c of companyList) companyMap[c.id] = { name: c.name, room_number: c.room_number, interview_date: c.interview_date };
+        const companyIds = companyList.map(c => c.id);
 
-        const companyIds = Object.keys(companyMap);
+        // 2. Fetch ALL queue tickets for those companies
+        const { data: tickets } = companyIds.length > 0
+            ? await supabaseAdmin
+                .from("queue_tickets")
+                .select("id, registration_id, company_id, status, position, created_at, interview_started_at, interview_ended_at, interview_duration_minutes")
+                .in("company_id", companyIds)
+            : { data: [] };
 
-        // 2. Fetch queue tickets for those companies (all statuses)
-        let ticketsQuery = supabaseAdmin
-            .from("queue_tickets")
-            .select("id, registration_id, company_id, status, position, visit_order, created_at, interview_started_at, interview_ended_at, interview_duration_minutes");
-
-        if (companyIds.length > 0) {
-            ticketsQuery = ticketsQuery.in("company_id", companyIds);
+        // 3. Group tickets by registration_id → company_id
+        type TicketRow = {
+            id: string; company_id: string; status: string; position: number;
+            created_at: string; interview_started_at: string | null;
+            interview_ended_at: string | null; interview_duration_minutes: number | null;
+        };
+        const ticketsByReg: Record<string, Record<string, TicketRow>> = {};
+        for (const t of (tickets || []) as TicketRow[]) {
+            if (!ticketsByReg[t.registration_id]) ticketsByReg[t.registration_id] = {};
+            ticketsByReg[t.registration_id][t.company_id] = t;
         }
-        const { data: tickets } = await ticketsQuery;
 
-        // 3. Fetch all relevant registrations
-        const registrationIds = [...new Set((tickets || []).map(t => t.registration_id))];
+        // 4. Fetch all relevant registrations (anyone who has at least one ticket)
+        const registrationIds = Object.keys(ticketsByReg);
 
-        type RegRow = { id: string; university: string; full_name: string; student_number: string; email: string; contact_number: string; faculty: string; department: string; level: string; employment_type: string; job_opportunities: string; companies_march3: string; companies_march4: string; is_present: boolean; created_at: string; cv_link: string; };
+        type RegRow = {
+            id: string; university: string; full_name: string; student_number: string;
+            email: string; contact_number: string; faculty: string; department: string;
+            level: string; employment_type: string; job_opportunities: string;
+            companies_march3: string; companies_march4: string;
+            is_present: boolean; created_at: string; cv_link: string;
+        };
 
         const { data: registrations } = registrationIds.length > 0
             ? await supabaseAdmin
                 .from("registrations")
                 .select("id, university, full_name, student_number, email, contact_number, faculty, department, level, employment_type, job_opportunities, companies_march3, companies_march4, is_present, created_at, cv_link")
                 .in("id", registrationIds)
+                .order("full_name")
             : { data: [] as RegRow[] };
 
-        const regMap: Record<string, RegRow> = {};
-        for (const r of (registrations as RegRow[]) || []) regMap[r.id] = r;
+        // 5. Build headers — fixed personal info columns + dynamic per-company columns
+        const fmt = (d: string | null) => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Colombo" }) : "";
 
-
-        // 4. Build flat rows — one row per ticket (person × company visit)
-        const rows = (tickets || []).map(ticket => {
-            const reg = regMap[ticket.registration_id] || {};
-            const company = companyMap[ticket.company_id] || {};
-            const fmt = (d: string | null) => d ? new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Colombo" }) : "";
-            return {
-                // Registration info
-                full_name: reg.full_name || "",
-                university: reg.university || "",
-                student_number: reg.student_number || "",
-                email: reg.email || "",
-                contact_number: reg.contact_number || "",
-                faculty: reg.faculty || "",
-                department: reg.department || "",
-                level: reg.level || "",
-                employment_type: reg.employment_type || "",
-                job_opportunities: reg.job_opportunities || "",
-                cv_link: reg.cv_link || "",
-                registered_at: fmt(reg.created_at),
-                is_present: reg.is_present ? "Yes" : "No",
-                // Company/Queue info
-                company: company.name || "",
-                room_number: company.room_number || "",
-                interview_date: company.interview_date || "",
-                queue_status: ticket.status,
-                queue_position: ticket.position,
-                queue_created_at: fmt(ticket.created_at),
-                // Interview timings
-                interview_started_at: fmt(ticket.interview_started_at),
-                interview_ended_at: fmt(ticket.interview_ended_at),
-                interview_duration_minutes: ticket.interview_duration_minutes ?? "",
-            };
-        });
-
-        // 5. Build CSV
-        const headers = [
+        const personalHeaders = [
             "Full Name", "University", "Student Number", "Email", "Contact Number",
             "Faculty", "Department", "Level", "Employment Type", "Job Opportunities", "CV Link",
+            "Companies Selected (March 3)", "Companies Selected (March 4)",
             "Registered At", "Is Present",
-            "Company", "Room Number", "Interview Date",
-            "Queue Status", "Queue Position", "Queued At",
-            "Interview Started At", "Interview Ended At", "Interview Duration (mins)"
         ];
 
+        // For each company: 6 columns
+        const companyHeaders: string[] = [];
+        for (const c of companyList) {
+            const label = `${c.name} (${c.interview_date})`;
+            companyHeaders.push(
+                `${label} - Status`,
+                `${label} - Queue Position`,
+                `${label} - Queued At`,
+                `${label} - Interview Started`,
+                `${label} - Interview Ended`,
+                `${label} - Duration (mins)`,
+            );
+        }
+
+        const headers = [...personalHeaders, ...companyHeaders];
+
+        // 6. Build one row per registrant
         const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
-        const csv = [
-            headers.join(","),
-            ...rows.map(r => [
-                escape(r.full_name), escape(r.university), escape(r.student_number), escape(r.email), escape(r.contact_number),
-                escape(r.faculty), escape(r.department), escape(r.level), escape(r.employment_type), escape(r.job_opportunities), escape(r.cv_link),
-                escape(r.registered_at), escape(r.is_present),
-                escape(r.company), escape(r.room_number), escape(r.interview_date),
-                escape(r.queue_status), escape(r.queue_position), escape(r.queue_created_at),
-                escape(r.interview_started_at), escape(r.interview_ended_at), escape(r.interview_duration_minutes),
-            ].join(","))
-        ].join("\n");
+        const rows = ((registrations as RegRow[]) || []).map(reg => {
+            const personalCols = [
+                escape(reg.full_name),
+                escape(reg.university),
+                escape(reg.student_number),
+                escape(reg.email),
+                escape(reg.contact_number),
+                escape(reg.faculty),
+                escape(reg.department),
+                escape(reg.level),
+                escape(reg.employment_type),
+                escape(reg.job_opportunities),
+                escape(reg.cv_link),
+                escape(reg.companies_march3),
+                escape(reg.companies_march4),
+                escape(fmt(reg.created_at)),
+                escape(reg.is_present ? "Yes" : "No"),
+            ];
+
+            const companyCols: string[] = [];
+            for (const c of companyList) {
+                const ticket = ticketsByReg[reg.id]?.[c.id];
+                if (ticket) {
+                    companyCols.push(
+                        escape(ticket.status),
+                        escape(ticket.position),
+                        escape(fmt(ticket.created_at)),
+                        escape(fmt(ticket.interview_started_at)),
+                        escape(fmt(ticket.interview_ended_at)),
+                        escape(ticket.interview_duration_minutes ?? ""),
+                    );
+                } else {
+                    // Not queued for this company — fill with blanks
+                    companyCols.push("", "", "", "", "", "");
+                }
+            }
+
+            return [...personalCols, ...companyCols].join(",");
+        });
+
+        const csv = [headers.join(","), ...rows].join("\n");
 
         const dateLabel = date || "all";
         return new NextResponse(csv, {
