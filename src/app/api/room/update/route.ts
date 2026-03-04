@@ -47,10 +47,36 @@ export async function POST(req: NextRequest) {
 
             if (updErr) throw updErr;
         } else {
-            // Normal status update
+            // Build update payload with tracking timestamps
+            const now = new Date().toISOString();
+            const updatePayload: Record<string, unknown> = { status: newStatus };
+
+            if (newStatus === "interviewing") {
+                // Record when the interview actually began
+                updatePayload.interview_started_at = now;
+                updatePayload.interview_ended_at = null;
+                updatePayload.interview_duration_minutes = null;
+            } else if (newStatus === "completed" || newStatus === "skipped") {
+                // Record when it ended and calculate duration
+                updatePayload.interview_ended_at = now;
+
+                // Fetch the start time to calculate duration
+                const { data: ticket } = await supabaseAdmin
+                    .from("queue_tickets")
+                    .select("interview_started_at")
+                    .eq("id", ticketId)
+                    .single();
+
+                if (ticket?.interview_started_at) {
+                    const startMs = new Date(ticket.interview_started_at).getTime();
+                    const durationMins = Math.round((new Date(now).getTime() - startMs) / 60000);
+                    updatePayload.interview_duration_minutes = durationMins;
+                }
+            }
+
             const { error: updErr } = await supabaseAdmin
                 .from("queue_tickets")
-                .update({ status: newStatus })
+                .update(updatePayload)
                 .eq("id", ticketId)
                 .eq("company_id", companyId);
 
