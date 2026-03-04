@@ -43,12 +43,12 @@ export async function GET(req: NextRequest) {
         // 3. Fetch all relevant registrations
         const registrationIds = [...new Set((tickets || []).map(t => t.registration_id))];
 
-        type RegRow = { id: string; full_name: string; student_number: string; email: string; contact_number: string; faculty: string; department: string; level: string; employment_type: string; job_opportunities: string; companies_march3: string; companies_march4: string; is_present: boolean; created_at: string; };
+        type RegRow = { id: string; university: string; full_name: string; student_number: string; email: string; contact_number: string; faculty: string; department: string; level: string; employment_type: string; job_opportunities: string; companies_march3: string; companies_march4: string; is_present: boolean; created_at: string; cv_link: string; };
 
         const { data: registrations } = registrationIds.length > 0
             ? await supabaseAdmin
                 .from("registrations")
-                .select("id, full_name, student_number, email, contact_number, faculty, department, level, employment_type, job_opportunities, companies_march3, companies_march4, is_present, created_at")
+                .select("id, university, full_name, student_number, email, contact_number, faculty, department, level, employment_type, job_opportunities, companies_march3, companies_march4, is_present, created_at, cv_link")
                 .in("id", registrationIds)
             : { data: [] as RegRow[] };
 
@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
             return {
                 // Registration info
                 full_name: reg.full_name || "",
+                university: reg.university || "",
                 student_number: reg.student_number || "",
                 email: reg.email || "",
                 contact_number: reg.contact_number || "",
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
                 level: reg.level || "",
                 employment_type: reg.employment_type || "",
                 job_opportunities: reg.job_opportunities || "",
+                cv_link: reg.cv_link || "",
                 registered_at: fmt(reg.created_at),
                 is_present: reg.is_present ? "Yes" : "No",
                 // Company/Queue info
@@ -90,8 +92,8 @@ export async function GET(req: NextRequest) {
 
         // 5. Build CSV
         const headers = [
-            "Full Name", "Student Number", "Email", "Contact Number",
-            "Faculty", "Department", "Level", "Employment Type", "Job Opportunities",
+            "Full Name", "University", "Student Number", "Email", "Contact Number",
+            "Faculty", "Department", "Level", "Employment Type", "Job Opportunities", "CV Link",
             "Registered At", "Is Present",
             "Company", "Room Number", "Interview Date",
             "Queue Status", "Queue Position", "Queued At",
@@ -103,8 +105,8 @@ export async function GET(req: NextRequest) {
         const csv = [
             headers.join(","),
             ...rows.map(r => [
-                escape(r.full_name), escape(r.student_number), escape(r.email), escape(r.contact_number),
-                escape(r.faculty), escape(r.department), escape(r.level), escape(r.employment_type), escape(r.job_opportunities),
+                escape(r.full_name), escape(r.university), escape(r.student_number), escape(r.email), escape(r.contact_number),
+                escape(r.faculty), escape(r.department), escape(r.level), escape(r.employment_type), escape(r.job_opportunities), escape(r.cv_link),
                 escape(r.registered_at), escape(r.is_present),
                 escape(r.company), escape(r.room_number), escape(r.interview_date),
                 escape(r.queue_status), escape(r.queue_position), escape(r.queue_created_at),
