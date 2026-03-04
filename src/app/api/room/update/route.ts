@@ -52,15 +52,12 @@ export async function POST(req: NextRequest) {
             const updatePayload: Record<string, unknown> = { status: newStatus };
 
             if (newStatus === "interviewing") {
-                // Record when the interview actually began
                 updatePayload.interview_started_at = now;
                 updatePayload.interview_ended_at = null;
                 updatePayload.interview_duration_minutes = null;
             } else if (newStatus === "completed" || newStatus === "skipped") {
-                // Record when it ended and calculate duration
                 updatePayload.interview_ended_at = now;
 
-                // Fetch the start time to calculate duration
                 const { data: ticket } = await supabaseAdmin
                     .from("queue_tickets")
                     .select("interview_started_at")
@@ -74,14 +71,24 @@ export async function POST(req: NextRequest) {
                 }
             }
 
+            // Try with timestamps first; fall back to status-only if columns don't exist yet
             const { error: updErr } = await supabaseAdmin
                 .from("queue_tickets")
                 .update(updatePayload)
                 .eq("id", ticketId)
                 .eq("company_id", companyId);
 
-            if (updErr) throw updErr;
+            if (updErr) {
+                // Columns might not exist yet — fall back to plain status update
+                const { error: fallbackErr } = await supabaseAdmin
+                    .from("queue_tickets")
+                    .update({ status: newStatus })
+                    .eq("id", ticketId)
+                    .eq("company_id", companyId);
+                if (fallbackErr) throw fallbackErr;
+            }
         }
+
 
         return NextResponse.json({ success: true });
     } catch (err: any) {
