@@ -14,6 +14,7 @@ export default function RegistrationPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedForm, setSubmittedForm] = useState<typeof form | null>(null);
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
@@ -95,27 +96,86 @@ export default function RegistrationPage() {
       return;
     }
 
+    setSubmittedForm({ ...form });
     setSubmitting(false);
     setSubmitted(true);
   };
 
-  if (submitted) return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4">
-      <div className="text-center max-w-md">
-        <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center mx-auto mb-6">
-          <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h1 className="text-3xl font-black text-white mb-3">You&apos;re Registered!</h1>
-        <p className="text-slate-400 mb-6">Your registration has been submitted. Please watch the display board for your name to be called.</p>
-        <div className="flex gap-3 justify-center">
-          <a href="/board" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-sm transition-all">View Display Board</a>
-          <button onClick={() => setSubmitted(false)} className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-semibold text-sm transition-all">Register Another</button>
+  if (submitted && submittedForm) {
+    const todayStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    const todayDate = new Date().toISOString().split("T")[0];
+    const isMarch3 = todayDate === "2026-03-03";
+    const isMarch4 = todayDate === "2026-03-04";
+    const todayCompanyIds = isMarch3 ? submittedForm.companies_march3 : isMarch4 ? submittedForm.companies_march4 : [];
+    const tomorrowCompanyIds = isMarch3 ? submittedForm.companies_march4 : [];
+    const todayCompanyNames = todayCompanyIds.map(id => companies.find(c => c.id === id)?.name).filter(Boolean);
+    const tomorrowCompanyNames = tomorrowCompanyIds.map(id => companies.find(c => c.id === id)?.name).filter(Boolean);
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4">
+        <div className="text-center max-w-md w-full">
+          <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-black text-white mb-1">You&apos;re Registered!</h1>
+          <p className="text-slate-400 mb-6 text-sm">Welcome, <span className="text-white font-semibold">{submittedForm.full_name}</span></p>
+
+          {/* Attendance badge */}
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-5 py-4 mb-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="text-emerald-400 font-bold text-sm">Attendance Marked ✓</p>
+              <p className="text-slate-400 text-xs">You are marked as present for {todayStr}</p>
+            </div>
+          </div>
+
+          {/* Today's queue */}
+          {todayCompanyNames.length > 0 && (
+            <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl px-5 py-4 mb-4 text-left">
+              <p className="text-indigo-400 font-bold text-sm mb-2">✓ Added to Today&apos;s Queue</p>
+              <ul className="space-y-1">
+                {todayCompanyNames.map((name, i) => (
+                  <li key={i} className="text-white text-sm font-medium flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Tomorrow's companies */}
+          {tomorrowCompanyNames.length > 0 && (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl px-5 py-4 mb-6 text-left">
+              <p className="text-slate-400 font-bold text-sm mb-2">⏳ March 4 — Queue on Arrival</p>
+              <ul className="space-y-1">
+                {tomorrowCompanyNames.map((name, i) => (
+                  <li key={i} className="text-slate-400 text-sm flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" />
+                    {name}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-slate-500 text-xs mt-2">You will be queued automatically when you arrive tomorrow.</p>
+            </div>
+          )}
+
+          <div className="flex gap-3 justify-center">
+            <a href="/display" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-sm transition-all">View Display Board</a>
+            <button onClick={() => { setSubmitted(false); setSubmittedForm(null); }} className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-semibold text-sm transition-all">Register Another</button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 py-10 px-4">
